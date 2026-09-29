@@ -30,6 +30,9 @@
 - [ ] Negationen, Fremdsprache, Hintergrundstimmen, Ansage-Echos und Kombinationsbefehle
   lösen keine Aktion aus. Reine Mailboxansage ergibt keine Aktion.
 - [ ] Beide Aktionen nacheinander, direkter Folgeauftrag, Ja/Nein, Schweigen und Timeout.
+- [ ] Nach dem Signalton bleibt die vollständige Antwortzeit; kurze Geräusche ohne
+  erkannten Text lösen keine sofortige Nachfrage aus. Später Sprechbeginn erhält
+  eine eigene begrenzte Sprechfrist, auch bei Ja-/Nein-Bestätigungen.
 - [ ] Dieselbe Aktion mehrfach neu anfordern; bei aktivierter Bestätigungsfrage jedes Mal neu bestätigen.
 - [ ] Vor explizitem Ja zur Bestätigungsfrage kein Gerätebefehl. Nein/Abbrechen,
   unsicheres Ja, andere Aktionen, Schweigen und Auflegen führen nicht zur Ausführung.

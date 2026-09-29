@@ -30,6 +30,8 @@ flowchart TD
     Greeting --> Beep[Signalton, dann zuhören]
     Empty --> Beep
     Beep --> Input{Eingabe}
+    Input -- Geräusch ohne erkannten Text --> Wait[Im ursprünglichen Antwortfenster weiter zuhören<br/>kein neuer Signalton, kein Fehlversuch]
+    Wait --> Input
     Input -- Nein / Auflegen / Abbrechen --> Bye["Auf Wiederhören."]
     Bye --> End([Auflegen])
     Input -- Ja als Antwort auf Folgefrage --> Ask["Was möchtest du tun?"]
@@ -46,6 +48,8 @@ flowchart TD
     ConfirmRequired -- Ja --> Confirm["{confirmation_text}<br/>z. B. Soll ich das Garagentor öffnen?"]
     Confirm --> ConfirmBeep[Signalton, dann Bestätigung anhören]
     ConfirmBeep --> Confirmation{Antwort}
+    Confirmation -- Geräusch ohne erkannten Text --> ConfirmWait[Im ursprünglichen Antwortfenster weiter zuhören]
+    ConfirmWait --> Confirmation
     Confirmation -- Ja / Ja bitte --> Execute
     Confirmation -- Nein / Abbrechen --> Cancelled["Abgebrochen."]
     Confirmation -- Auflegen / Tschüss --> Bye
@@ -85,10 +89,16 @@ bei ausreichend sicherer Erkennung. Ein anderer Auftrag während der
 Bestätigungsfrage wird nicht ausgeführt; die Frage zur ursprünglichen Aktion
 wird erneut gestellt.
 
-Standardwerte: 1 s Begrüßungspause, 3 s Rückrufpause, 8 s Zuhörzeit, 2 aufeinander
-folgende Verständnisfehler, 120 s maximale Gesprächsdauer. Nach normalen Ansagen
+Standardwerte: 1 s Begrüßungspause, 3 s Rückrufpause, 15 s bis zum Antwortbeginn,
+15 s ab erkanntem Sprechbeginn, 2 aufeinander folgende Verständnisfehler und
+120 s maximale Gesprächsdauer. Die Antwortfrist beginnt erst nach Ansage,
+Signalton und kurzer Echo-Schutzpause. Nach normalen Ansagen
 kommt ein kurzer Signalton; nach einer Abschiedsansage wird direkt aufgelegt.
 Während Ansagen und Befehlsausführung werden keine Sprachbefehle ausgewertet.
+
+Ein kurzer Ton-/Geräuschimpuls ohne erkannten Text wird ignoriert. Dabei bleibt
+das ursprüngliche Antwortfenster erhalten, auch bei einer Bestätigungsfrage.
+Eine erkannte begonnene Äußerung bekommt ihre eigene, begrenzte Sprechfrist.
 
 Die Nachfrage nennt aktuell fest „Haustür öffnen“, auch wenn nur andere Aktionen
 aktiviert sind. Namen, Bestätigungsfragen und Erfolgsansagen sind variabel; die

@@ -20,7 +20,8 @@ callers: []
 
 dialog:
   answer_delay_ms: 1000
-  listen_timeout_seconds: 8
+  listen_timeout_seconds: 15  # Zeit bis zum Beginn einer Antwort, nach dem Signalton
+  max_utterance_seconds: 15   # Eigene Frist ab erkanntem Sprechbeginn
   max_failures: 2
   max_call_seconds: 120
 

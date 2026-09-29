@@ -2,6 +2,7 @@
 
 import importlib
 import queue
+import struct
 import sys
 import threading
 import time
@@ -183,3 +184,65 @@ def test_question_playback_and_beep_preserve_confirmation_until_explicit_yes(set
     assert len(submitted) == (0 if disconnected else 1)
     if submitted:
         assert submitted[0][1].id == action.id
+
+
+def listening_engine(setup, monkeypatch):
+    sip, _, e, _, _, _ = setup
+    clock = [100.0]
+    monkeypatch.setattr(sip.time, "monotonic", lambda: clock[0])
+    e.dialog = Dialog(replace(e.config, actions=[replace(e.config.actions[0], enabled=True)]))
+    e.endpoint = types.SimpleNamespace(libHandleEvents=lambda _: None)
+    e.events = queue.Queue()
+    resets, effects = [], []
+    e.speech = types.SimpleNamespace(feed=lambda _: None, finish=lambda: None, reset=lambda: resets.append(True))
+    call = types.SimpleNamespace(
+        session=e.dialog.connected(e.config.callers[0]), cancelled=threading.Event(),
+        confirmed=True, media=object(), audio=queue.Queue(), listen_at=None,
+        listening=True, followup=False, audio_overflow=False, last_voice=None,
+    )
+    e.current = call
+    e.dispatch = lambda _call, effect: effects.append(effect) if effect else None
+    e.dialog.listened(call.session, clock[0])
+    return e, call, clock, effects, resets
+
+
+def test_beep_or_click_without_transcription_does_not_prompt_immediately(setup, monkeypatch):
+    e, call, clock, effects, resets = listening_engine(setup, monkeypatch)
+    for at in (100.2, 103, 108, 114):
+        clock[0] = at
+        call.audio.put(struct.pack('<h', 500) * 320)
+        e.step()
+        clock[0] = at + .8
+        e.step()
+        assert not effects
+        assert call.session.failures == 0
+        assert call.session.deadline == 115
+        assert call.last_voice is None
+    assert len(resets) == 4
+    clock[0] = 115
+    e.step()
+    assert len(effects) == 1
+    assert effects[0][0] == "say"
+
+
+def test_adapter_accepts_complete_speech_after_original_answer_deadline(setup, monkeypatch):
+    e, call, clock, effects, _ = listening_engine(setup, monkeypatch)
+    clock[0] = 114.5
+    call.audio.put(struct.pack('<h', 500) * 320)
+    e.step()
+    assert call.session.deadline == 129.5
+    e.speech.finish = lambda: ("Haustür öffnen", 1)
+    clock[0] = 115.3
+    e.step()
+    assert effects == [("execute", "front_door_open")]
+
+
+def test_adapter_does_not_execute_a_prefix_at_maximum_utterance_duration(setup, monkeypatch):
+    e, call, clock, effects, _ = listening_engine(setup, monkeypatch)
+    clock[0] = 101
+    call.audio.put(struct.pack('<h', 500) * 320)
+    e.step()
+    e.speech.finish = lambda: ("Haustür öffnen", 1)
+    clock[0] = 116
+    e.step()
+    assert len(effects) == 1 and effects[0][0] == "say"

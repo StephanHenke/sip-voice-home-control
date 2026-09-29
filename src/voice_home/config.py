@@ -190,7 +190,7 @@ def load(path: str | Path) -> Config:
             if not isinstance(action.command, str) or not action.command or (action.feedback_mode == "state" and not action.resolved_success_values):
                 raise ValueError("Aktivierte Aktion benötigt Befehl und Erfolgswerte")
         actions.append(action)
-    dialog = {"answer_delay_ms": 1000, "listen_timeout_seconds": 8, "max_failures": 2, "max_call_seconds": 120, **raw.get("dialog", {})}
+    dialog = {"answer_delay_ms": 1000, "listen_timeout_seconds": 15, "max_utterance_seconds": 15, "max_failures": 2, "max_call_seconds": 120, **raw.get("dialog", {})}
     callback = {"trigger_mode": "reject", "delay_ms": 3000, "ring_timeout_seconds": 30, "cooldown_seconds": 60, "max_attempts_per_number_per_hour": 5, **raw.get("callback", {})}
     if callback["trigger_mode"] not in {"reject", "answer_hangup"}:
         raise ValueError("callback.trigger_mode muss reject oder answer_hangup sein")

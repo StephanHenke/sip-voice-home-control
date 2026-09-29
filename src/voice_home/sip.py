@@ -365,8 +365,14 @@ class Engine:
             call.audio_overflow = False
             self.dialog.listened(call.session, now, call.followup)
             call.listening = True
+            log.info("dialog_listening state=%s wait_seconds=%s", call.session.state, self.config.dialog["listen_timeout_seconds"])
         if call.listening:
+            if now >= call.session.deadline:
+                log.info("dialog_response_timeout state=%s speech_started=%s", call.session.state, call.session.speech_started_at is not None)
+                self.dispatch(call, self.dialog.tick(call.session, now))
+                return
             if call.audio_overflow:
+                log.warning("speech_audio_overflow")
                 self.dispatch(call, self.dialog.misunderstood(call.session))
                 return
             for _ in range(10):
@@ -376,13 +382,22 @@ class Engine:
                     break
                 if pcm and audioop.rms(pcm, 2) >= 250:
                     call.last_voice = now
+                    self.dialog.speech_started(call.session, now)
                 recognized = self.speech.feed(pcm)
                 if recognized:
                     self.dispatch(call, self.dialog.recognize(call.session, *recognized))
                     break
             if call.listening and call.last_voice is not None and now - call.last_voice >= self.config.speech["end_silence_ms"] / 1000:
                 recognized = self.speech.finish()
-                self.dispatch(call, self.dialog.recognize(call.session, *(recognized or ("", 0))))
+                if recognized:
+                    self.dispatch(call, self.dialog.recognize(call.session, *recognized))
+                else:
+                    # A click/beep/echo can trigger RMS without producing speech.
+                    # Keep listening within the original response window.
+                    self.speech.reset()
+                    call.last_voice = None
+                    self.dialog.no_speech(call.session)
+                    log.info("speech_empty_result ignored=True")
         self.dispatch(call, self.dialog.tick(call.session, now))
 
     def health(self):

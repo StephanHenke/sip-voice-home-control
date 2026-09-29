@@ -147,7 +147,7 @@ def test_low_confidence_silence_and_max_duration(config):
     d.listened(s, 1)
     assert d.recognize(s, "Tür öffnen", .2)[0] == "say"
     d.listened(s, 2)
-    assert d.tick(s, 11)[0] == "goodbye"
+    assert d.tick(s, 17)[0] == "goodbye"
     assert d.tick(s, 120)[0] == "hangup"
 
 

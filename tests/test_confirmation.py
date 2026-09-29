@@ -73,9 +73,9 @@ def test_uncertain_or_different_request_never_confirms(dialog, text, confidence)
 def test_confirmation_silence_and_call_deadline_clear_pending(dialog):
     s = session(dialog)
     ask(dialog, s)
-    assert dialog.tick(s, 11) == ("say", "Bitte antworte mit Ja oder Nein. " + QUESTION)
-    dialog.listened(s, 12)
-    assert dialog.tick(s, 21) == ("goodbye", "Ich konnte dich nicht verstehen. Auf Wiederhören.")
+    assert dialog.tick(s, 17) == ("say", "Bitte antworte mit Ja oder Nein. " + QUESTION)
+    dialog.listened(s, 18)
+    assert dialog.tick(s, 33) == ("goodbye", "Ich konnte dich nicht verstehen. Auf Wiederhören.")
     assert s.pending_action is None
     assert dialog.recognize(s, "ja", 1) is None
     s = session(dialog)

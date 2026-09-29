@@ -19,7 +19,10 @@
 - Torzuordnung zunächst deaktiviert, bis Befehl/Rückmeldung bekannt und geprüft sind.
 - Nach Ergebnis weitere Aktionen anbieten. Direkten Folgeauftrag akzeptieren;
   „Ja“ fragt nach, „Nein“/„Auflegen“ beendet den Anruf.
-- Acht Sekunden Eingabewartezeit, zwei Fehlversuche, maximal 120 Sekunden Gespräch.
+- 15 Sekunden bis zum Antwortbeginn nach dem Signalton, danach eigene Sprechfrist
+  von höchstens 15 Sekunden; beide Werte konfigurierbar. Zwei Fehlversuche,
+  maximal 120 Sekunden Gespräch. Kurze Geräusche ohne erkannten Text verbrauchen
+  keinen Fehlversuch und setzen die Antwortfrist nicht neu.
 - Keine Aktionen während der Ansage, Bereitschaftston vor der Eingabe.
 - Dieselbe Aktion darf im Gespräch mehrfach neu angefordert werden; kein automatischer Wiederholungsversand.
 - Optionale Bestätigungsfrage je Aktion, konfigurierbar mit eigenem Text. Nur ein

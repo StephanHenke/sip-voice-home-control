@@ -15,6 +15,8 @@ class Session:
     deadline: float = 0
     pending_action: str | None = None
     failures: int = 0
+    listen_deadline: float = 0
+    speech_started_at: float | None = None
 
 
 class Dialog:
@@ -54,6 +56,18 @@ class Dialog:
     def listened(self, s: Session, now: float, followup: bool = False):
         s.state = "confirming" if s.pending_action is not None else "followup" if followup else "listening"
         s.deadline = now + self.config.dialog["listen_timeout_seconds"]
+        s.listen_deadline = s.deadline
+        s.speech_started_at = None
+
+    def speech_started(self, s: Session, now: float):
+        if s.state in {"listening", "followup", "confirming"} and s.speech_started_at is None:
+            s.speech_started_at = now
+            s.deadline = now + self.config.dialog["max_utterance_seconds"]
+
+    def no_speech(self, s: Session):
+        # Noise must neither consume a failure nor restart the answer timer.
+        s.speech_started_at = None
+        s.deadline = s.listen_deadline
 
     def misunderstood(self, s: Session) -> tuple[str, str]:
         s.failures += 1

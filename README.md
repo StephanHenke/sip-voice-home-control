@@ -121,6 +121,24 @@ Nach dessen Ende und der Rückrufpause wird die konfigurierte Nummer gewählt.
 Erst nach Annahme und Bereitstellung des Audiokanals beginnt die Begrüßungspause. `answer_delay_ms: 0` deaktiviert
 diese zusätzliche Pause. Folgeansagen warten nicht erneut.
 
+Nach Ansage, Signalton und kurzer Echo-Schutzpause beginnt das Antwortfenster.
+Direkte Anrufe und Rückrufe verwenden dieselben einstellbaren Zeiten:
+
+```yaml
+dialog:
+  listen_timeout_seconds: 15  # Warten auf den Beginn einer Antwort
+  max_utterance_seconds: 15   # Höchstdauer ab erkanntem Sprechbeginn
+```
+
+Das gilt auch für Bestätigungs- und Folgefragen. Ein kurzer Geräuschimpuls ohne
+erkannten Text verbraucht keinen Fehlversuch; der Controller wartet bis zum Ende
+des ursprünglichen Antwortfensters weiter. Geräusche setzen dieses Fenster nicht
+neu auf 15 Sekunden. Beginnt eine Antwort kurz vor dessen Ende, wird sie durch
+die eigene Sprechfrist nicht sofort abgeschnitten. Bei Überschreiten der
+Sprechfrist wird nachgefragt, ohne einen unvollständigen Befehl auszuführen.
+`speech.end_silence_ms` bestimmt weiterhin die manuelle Auswertung nach einer
+Sprechpause; der Spracherkenner kann selbst bereits vorher ein Satzende melden.
+
 Fehlschläge zählen zum Rückruflimit. Es gibt keine Wahlwiederholung, keinen
 Fallback auf direkte Annahme und keine Rückrufwarteschlange. Ein aktiver oder
 ausstehender Rückruf belegt den einzigen Gesprächsplatz. SIP-Weiterleitungen
