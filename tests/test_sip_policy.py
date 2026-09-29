@@ -155,29 +155,45 @@ def test_question_playback_and_beep_preserve_confirmation_until_explicit_yes(set
     e.dialog = Dialog(replace(e.config, actions=[action]))
     e.endpoint = types.SimpleNamespace(libHandleEvents=lambda _: None)
     e.events = queue.Queue()
-    e.speech = types.SimpleNamespace(path=lambda text: text, beep="beep", reset=lambda: None)
+    preparation = []
+    e.speech = types.SimpleNamespace(path=lambda text: text, beep="beep", reset=lambda: preparation.append("reset"))
     submitted = []
     e.openhab = types.SimpleNamespace(execute=lambda *_: None)
     e.pool = types.SimpleNamespace(submit=lambda *args: submitted.append(args))
     call = types.SimpleNamespace(
         session=e.dialog.connected(e.config.callers[0]), cancelled=threading.Event(),
-        confirmed=True, media=object(), audio=queue.Queue(), listen_at=None,
+        confirmed=True, media=object(), audio=queue.Queue(), beep_at=None,
         listening=False, followup=False,
     )
     def play(path, after):
+        preparation.append(path)
         call.player = types.SimpleNamespace(after=after, stopTransmit=lambda _: None)
     call.play = play
     e.current = call
     e.dialog.listened(call.session, time.monotonic())
     e.dispatch(call, e.dialog.recognize(call.session, "Haustür öffnen", 1))
     assert not submitted
-    e.process_event("playback", call, call.player)  # question -> beep
-    e.process_event("playback", call, call.player)  # beep -> guarded listening
-    call.listen_at = time.monotonic() - 1
+    e.process_event("playback", call, call.player)  # question -> echo guard
+    assert not call.listening
+    assert call.player is None
+    call.beep_at = time.monotonic() - 1
     e.step()
+    assert preparation[-2:] == ["reset", "beep"]
+    assert not call.listening
+    e.process_event("playback", call, call.player)  # beep -> immediate listening
     assert call.listening
     assert call.session.state == "confirming"
     assert not submitted
+    received = []
+    e.speech.feed = lambda pcm: received.append(pcm)
+    from voice_home.sip import AudioSink
+    sink = AudioSink.__new__(AudioSink)
+    sink.call = call
+    first_frame = struct.pack('<h', 500) * 320
+    sink.onFrameReceived(types.SimpleNamespace(buf=first_frame))
+    e.step()
+    assert received == [first_frame]  # No reset/queue clearing after the ready tone.
+    assert preparation.count("reset") == 1
     if disconnected:
         call.cancelled.set()
     e.dispatch(call, e.dialog.recognize(call.session, "ja", 1))
@@ -197,7 +213,7 @@ def listening_engine(setup, monkeypatch):
     e.speech = types.SimpleNamespace(feed=lambda _: None, finish=lambda: None, reset=lambda: resets.append(True))
     call = types.SimpleNamespace(
         session=e.dialog.connected(e.config.callers[0]), cancelled=threading.Event(),
-        confirmed=True, media=object(), audio=queue.Queue(), listen_at=None,
+        confirmed=True, media=object(), audio=queue.Queue(), beep_at=None,
         listening=True, followup=False, audio_overflow=False, last_voice=None,
     )
     e.current = call

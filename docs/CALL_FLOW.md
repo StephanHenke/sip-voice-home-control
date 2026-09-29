@@ -91,8 +91,9 @@ wird erneut gestellt.
 
 Standardwerte: 1 s Begrüßungspause, 3 s Rückrufpause, 15 s bis zum Antwortbeginn,
 15 s ab erkanntem Sprechbeginn, 2 aufeinander folgende Verständnisfehler und
-120 s maximale Gesprächsdauer. Die Antwortfrist beginnt erst nach Ansage,
-Signalton und kurzer Echo-Schutzpause. Nach normalen Ansagen
+120 s maximale Gesprächsdauer. Spracherkennung und Echo-Schutzpause werden vor
+dem Signalton vorbereitet; unmittelbar nach dem Ton beginnen Aufnahme und
+Antwortfrist. Nach normalen Ansagen
 kommt ein kurzer Signalton; nach einer Abschiedsansage wird direkt aufgelegt.
 Während Ansagen und Befehlsausführung werden keine Sprachbefehle ausgewertet.
 

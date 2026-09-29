@@ -67,7 +67,7 @@ class Call(pj.Call):
         self.sink = None
         self.player = None
         self.listening = False
-        self.listen_at = None
+        self.beep_at = None
         self.followup = False
         self.last_voice = None
         self.audio = queue.Queue(maxsize=100)
@@ -135,7 +135,7 @@ class Call(pj.Call):
 
     def play(self, path, after):
         self.listening = False
-        self.listen_at = None
+        self.beep_at = None
         if not self.confirmed or self.media is None or self.cancelled.is_set():
             self.end()
             return
@@ -298,10 +298,13 @@ class Engine:
             if value.after == "hangup":
                 call.end()
             elif value.after == "beep":
-                call.play(self.speech.beep, "listen")
+                # Let prompt echoes fade before announcing readiness.
+                call.beep_at = time.monotonic() + 0.25
             else:
-                # Short guard interval avoids recognizing speakerphone echo.
-                call.listen_at = time.monotonic() + 0.25
+                # ASR is already prepared. Capture immediately after the tone.
+                self.dialog.listened(call.session, time.monotonic(), call.followup)
+                call.listening = True
+                log.info("dialog_listening state=%s wait_seconds=%s", call.session.state, self.config.dialog["listen_timeout_seconds"])
 
     def step(self):
         self.endpoint.libHandleEvents(20)
@@ -356,16 +359,14 @@ class Engine:
                 call.end()
             return
         self.dialog.media_ready(call.session, now)
-        if call.listen_at is not None and now >= call.listen_at:
-            call.listen_at = None
+        if call.beep_at is not None and now >= call.beep_at:
+            call.beep_at = None
             while not call.audio.empty():
                 call.audio.get_nowait()
             self.speech.reset()
             call.last_voice = None
             call.audio_overflow = False
-            self.dialog.listened(call.session, now, call.followup)
-            call.listening = True
-            log.info("dialog_listening state=%s wait_seconds=%s", call.session.state, self.config.dialog["listen_timeout_seconds"])
+            call.play(self.speech.beep, "listen")
         if call.listening:
             if now >= call.session.deadline:
                 log.info("dialog_response_timeout state=%s speech_started=%s", call.session.state, call.session.speech_started_at is not None)

@@ -121,7 +121,8 @@ Nach dessen Ende und der Rückrufpause wird die konfigurierte Nummer gewählt.
 Erst nach Annahme und Bereitstellung des Audiokanals beginnt die Begrüßungspause. `answer_delay_ms: 0` deaktiviert
 diese zusätzliche Pause. Folgeansagen warten nicht erneut.
 
-Nach Ansage, Signalton und kurzer Echo-Schutzpause beginnt das Antwortfenster.
+Nach der Ansage wird die Spracherkennung vorbereitet; eine kurze Echo-Schutzpause
+liegt vor dem Signalton. Direkt nach dem Ton beginnt die Aufnahme samt Antwortfenster.
 Direkte Anrufe und Rückrufe verwenden dieselben einstellbaren Zeiten:
 
 ```yaml
