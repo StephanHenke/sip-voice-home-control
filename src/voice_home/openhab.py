@@ -110,13 +110,14 @@ class OpenHAB:
         sent = False
         try:
             trusted_feedback = True
-            if action.feedback_mode == "rollershutter_opening":
+            same_item = action.command_item == action.feedback_item
+            if action.feedback_mode == "rollershutter_opening" or same_item:
                 item_response = self.client.get(f"/rest/items/{action.feedback_item}", params={"metadata": "autoupdate"})
                 item_response.raise_for_status()
                 item = item_response.json()
-                if item.get("type") != "Rollershutter":
+                if action.feedback_mode == "rollershutter_opening" and item.get("type") != "Rollershutter":
                     return "failed"
-                if action.command_item == action.feedback_item:
+                if same_item:
                     auto = item.get("metadata", {}).get("autoupdate", {}).get("value")
                     trusted_feedback = str(auto).lower() == "false"
             watcher.start()
@@ -125,9 +126,10 @@ class OpenHAB:
             if baseline.text.strip() in {"NULL", "UNDEF"}:
                 return "unconfirmed"
             initial_percent = None
+            lower, upper = sorted((action.open_position, action.closed_position))
             if action.feedback_mode == "rollershutter_opening":
                 initial_percent = float(baseline.text.strip())
-                if not math.isfinite(initial_percent) or not 0 <= initial_percent <= 100:
+                if not math.isfinite(initial_percent) or not lower <= initial_percent <= upper:
                     return "unconfirmed"
             if cancelled.is_set() or watcher.failed.is_set():
                 return "unconfirmed"
@@ -138,10 +140,12 @@ class OpenHAB:
                 return "failed"
             response.raise_for_status()
             if not trusted_feedback:
-                # An UP command can make autoupdate predict 0 immediately.
+                # autoupdate can predict the target position immediately.
                 # The command was sent, but this cannot prove physical movement.
                 return "unconfirmed"
             deadline = dispatched_at + action.timeout_seconds
+            success_values = action.resolved_success_values
+            failure_values = action.resolved_failure_values
             while time.monotonic() < deadline and not cancelled.is_set():
                 if watcher.failed.is_set():
                     return "unconfirmed"
@@ -151,18 +155,21 @@ class OpenHAB:
                     continue
                 if event.at < dispatched_at:
                     continue
-                if event.value in action.failure_values:
+                if event.value in failure_values:
                     return "failed"
                 if initial_percent is not None:
                     try:
                         current = float(event.value)
                     except ValueError:
                         continue
-                    if math.isfinite(current) and 0 <= current < initial_percent:
+                    if math.isfinite(current) and lower <= current <= upper and abs(current - action.open_position) < abs(initial_percent - action.open_position):
                         return "ok"
                     continue
                 # Reject a pre-existing success state echoed by polling/autoupdate.
-                if event.value in action.success_values and event.value != baseline.text.strip():
+                changed = event.value != baseline.text.strip()
+                if action.state_values:
+                    changed = action.state_for(event.value) != action.state_for(baseline.text.strip())
+                if event.value in success_values and changed:
                     return "ok"
             return "unconfirmed"
         except (httpx.HTTPError, RuntimeError, ValueError):

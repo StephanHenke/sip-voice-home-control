@@ -81,9 +81,21 @@ actions:
       - "mach die {target} auf"
     command_item: GarageDoor
     command: UP
-    feedback_item: GarageDoor
-    feedback_mode: rollershutter_opening
-    success_values: []
-    failure_values: []
+    feedback_item: GarageDoor_ActualState
+    feedback_mode: state
+    # Beispielwerte des Geräts; passend zur eigenen Installation ersetzen.
+    state_values:
+      closed: ["1"]
+      opening: ["3"]
+      open: ["2"]
+    success_states: [opening, open]  # Nur [open]: erst ganz offen bestätigen
+    failure_states: []
+    # Ein einziges Item: feedback_item = command_item, mit autoupdate=false
+    # und tatsächlichen Geräteupdates. Prozentwerte stattdessen so auswerten:
+    # feedback_mode: rollershutter_opening
+    # state_values: {}
+    # success_states: []
+    # open_position: 0    # Invertiert: 100
+    # closed_position: 100 # Invertiert: 0
     timeout_seconds: 10
     success_text: "OK, das Garagentor öffnet sich."

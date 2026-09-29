@@ -19,7 +19,9 @@ Bereits durchgeführte Prüfungen stehen in [VALIDATION.md](docs/VALIDATION.md).
 - Einstellbare Pause nach Gesprächsannahme, standardmäßig eine Sekunde.
 - „Öffne die Haustür“, „Tür öffnen“, „schließe die Tür auf“, „Tür aufschließen“
   und weitere konfigurierte Satzmuster führen zur gleichen Aktion.
-- Bestätigung erst nach einer neuen, separaten openHAB-Geräterückmeldung.
+- Bestätigung erst nach einer neuen openHAB-Geräterückmeldung; ein gemeinsames
+  Befehls-/Status-Item ist mit deaktiviertem autoupdate ebenfalls möglich.
+- Item-Namen, Statusbedeutung und normale/invertierte Prozentwerte vollständig in YAML.
 - Mehrere unterschiedliche Aktionen je Gespräch; „Nein“ beendet den Dialog.
 - Erweiterung um Lichtaktionen über Konfiguration, ohne ein Sprachmodell umzuprogrammieren.
 
@@ -129,6 +131,9 @@ liegen außerhalb dieses Schutzes; dies ist keine persönliche Identitätsprüfu
 ## Aktionen und Sprache
 
 Die vollständige Konfiguration steht in [config.example.yaml](config.example.yaml).
+Alle Ansagen und Verzweigungen zeigt das [Gesprächsdiagramm](docs/CALL_FLOW.md).
+Item-Zuordnung, Statuswerte, Invertierung und Ein-Item-Betrieb stehen in
+[YAML-Konfiguration der Geräte](docs/DEVICE_CONFIGURATION.md).
 Jede Aktion hat eine eindeutige `id`, Ziel-Aliase und Satzmuster mit `{target}`.
 „Bitte“ wird automatisch an den Wortgrenzen zugelassen. Andere Wörter werden nicht
 einfach entfernt. Es gibt keinen unscharfen Teilstring-Abgleich.
@@ -161,7 +166,7 @@ nicht mehrere Aktionen gleichzeitig bezeichnen. Das wird beim Start geprüft.
 ## Rückmeldungen richtig anschließen
 
 Ein HTTP-Status 200/202 bestätigt nur die Annahme eines Befehls. Der Controller
-abonniert vor dem Versand den Ereignisstrom des separaten `feedback_item` und
+abonniert vor dem Versand den Ereignisstrom des `feedback_item` und
 wartet auf eine passende neue Rückmeldung. Ein bereits bestehender Erfolgszustand
 wird nicht als neuer Erfolg ausgegeben. NULL/UNDEF werden nicht als Erfolg gewertet.
 
@@ -172,12 +177,20 @@ nicht erst physisch aufdrücken. Für das Garagentor muss ein tatsächlicher Öf
 konfiguriert werden. Ein reiner Offen-/Geschlossen-Kontakt kann je nach Installation
 diese Aussage nicht liefern.
 
-Für ein Garagentor vom Typ `Rollershutter` unterstützt die Beispielkonfiguration
-`command: UP` mit `feedback_mode: rollershutter_opening`. Eine neue, kleinere
-Prozentposition bestätigt den Öffnungsbeginn (0 = offen, 100 = geschlossen).
-Befehls- und Rückmelde-Item dürfen in diesem Modus identisch sein. In diesem Fall
+Für diskrete Gerätewerte ordnet `state_values` die Rohwerte Zuständen zu, etwa
+`closed`, `opening` und `open`. `success_states` und `failure_states` bestimmen die
+Erfolgs- und Fehlerbedingungen. Bestehende `success_values`/`failure_values`
+funktionieren weiterhin; beide Schreibweisen dürfen nicht vermischt werden.
+
+Für ein Garagentor vom Typ `Rollershutter` gibt es zusätzlich
+`feedback_mode: rollershutter_opening`. Eine neue Prozentposition näher an
+`open_position` bestätigt den Öffnungsbeginn. Standard ist `open_position: 0`,
+`closed_position: 100`; für invertiertes Feedback werden diese Werte vertauscht.
+Die Invertierung betrifft nur die Auswertung, nicht den konfigurierten `command`.
+
+Befehls- und Rückmelde-Item dürfen in beiden Modi identisch sein. In diesem Fall
 muss das Item `autoupdate="false"` haben und seine Updates aus der realen
-Geräterückmeldung beziehen. Ohne explizit ausgeschaltetes autoupdate wird UP zwar
+Geräterückmeldung beziehen. Ohne explizit ausgeschaltetes autoupdate wird der Befehl zwar
 gesendet, aber eine vorhergesagte Position niemals als Erfolg angesagt; das
 Ergebnis lautet „Die Ausführung konnte nicht bestätigt werden“. Der Controller
 ändert die openHAB-Item-Konfiguration nicht automatisch.

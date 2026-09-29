@@ -54,6 +54,69 @@ class Action:
     failure_values: list[str] = field(default_factory=list)
     timeout_seconds: float = 10
     success_text: str = "OK."
+    state_values: dict[str, list[str]] = field(default_factory=dict)
+    success_states: list[str] = field(default_factory=list)
+    failure_states: list[str] = field(default_factory=list)
+    open_position: float = 0
+    closed_position: float = 100
+
+    @property
+    def resolved_success_values(self) -> set[str]:
+        return set(self.success_values) | {v for state in self.success_states for v in self.state_values[state]}
+
+    @property
+    def resolved_failure_values(self) -> set[str]:
+        return set(self.failure_values) | {v for state in self.failure_states for v in self.state_values[state]}
+
+    def state_for(self, value: str) -> str | None:
+        return next((state for state, values in self.state_values.items() if value in values), None)
+
+
+def validate_feedback(action: Action):
+    def values(value):
+        return isinstance(value, list) and all(isinstance(v, str) and v.strip() for v in value)
+
+    if not all(values(v) for v in (action.success_values, action.failure_values, action.success_states, action.failure_states)):
+        raise ValueError("Rückmeldewerte und Zustandsnamen müssen Listen nichtleerer Strings sein")
+    if not isinstance(action.state_values, dict):
+        raise ValueError("state_values muss Zustandsnamen auf Wertelisten abbilden")
+    seen_values = set()
+    for state, raw_values in action.state_values.items():
+        if not isinstance(state, str) or not re.fullmatch(r"[a-z][a-z0-9_]*", state) or not values(raw_values) or not raw_values:
+            raise ValueError("Zustandszuordnung benötigt Namen und nichtleere Wertelisten")
+        if seen_values & set(raw_values):
+            raise ValueError("Ein Rohwert darf nur einem Zustand zugeordnet sein")
+        seen_values.update(raw_values)
+    if (set(action.success_states) | set(action.failure_states)) - action.state_values.keys():
+        raise ValueError("Erfolgs- und Fehlerzustände müssen in state_values definiert sein")
+    if action.state_values and (action.success_values or action.failure_values):
+        raise ValueError("Zustandszuordnung und direkte Erfolgs-/Fehlerwerte nicht mischen")
+    success, failure = action.resolved_success_values, action.resolved_failure_values
+    if success & failure:
+        raise ValueError("Erfolgs- und Fehlerwerte überschneiden sich")
+    if {"NULL", "UNDEF"} & success:
+        raise ValueError("NULL/UNDEF sind keine Erfolgszustände")
+    if action.feedback_mode not in {"state", "rollershutter_opening"}:
+        raise ValueError("Unbekannter Rückmeldemodus")
+    for position in (action.open_position, action.closed_position):
+        if type(position) not in (int, float) or not math.isfinite(position) or not 0 <= position <= 100:
+            raise ValueError("Offene und geschlossene Position müssen zwischen 0 und 100 liegen")
+    if action.open_position == action.closed_position:
+        raise ValueError("Offene und geschlossene Position müssen unterschiedlich sein")
+    if action.feedback_mode == "rollershutter_opening":
+        if action.state_values or action.success_states or action.failure_states or action.success_values:
+            raise ValueError("Rollershutter-Positionen nicht mit Zustandszuordnung oder Erfolgswerten mischen")
+        if not isinstance(action.command, str):
+            raise ValueError("Rollershutter-Befehl muss ein String sein")
+        if action.command not in {"UP", "DOWN"}:
+            try:
+                command_position = float(action.command)
+            except (TypeError, ValueError):
+                raise ValueError("Rollershutter-Öffnung benötigt UP, DOWN oder eine Prozentposition") from None
+            if not math.isfinite(command_position) or not 0 <= command_position <= 100:
+                raise ValueError("Ungültige Rollershutter-Befehlsposition")
+    elif action.open_position != 0 or action.closed_position != 100:
+        raise ValueError("Positionszuordnung ist nur im Rollershutter-Modus erlaubt")
 
 
 @dataclass(frozen=True)
@@ -114,22 +177,11 @@ def load(path: str | Path) -> Config:
             raise ValueError("Satzmuster benötigen genau einen {target}-Platzhalter")
         if type(action.timeout_seconds) not in (int, float) or not 0 < action.timeout_seconds <= 60:
             raise ValueError("Aktions-Timeout muss zwischen 0 und 60 Sekunden liegen")
-        if not all(isinstance(v, str) for v in action.success_values + action.failure_values):
-            raise ValueError("Rückmeldewerte müssen Strings sein (Zahlen in Anführungszeichen)")
-        if set(action.success_values) & set(action.failure_values):
-            raise ValueError("Erfolgs- und Fehlerwerte überschneiden sich")
-        if {"NULL", "UNDEF"} & set(action.success_values):
-            raise ValueError("NULL/UNDEF sind keine Erfolgszustände")
-        if action.feedback_mode not in {"state", "rollershutter_opening"}:
-            raise ValueError("Unbekannter Rückmeldemodus")
-        if action.feedback_mode == "rollershutter_opening" and action.command not in {"UP", "0"}:
-            raise ValueError("Rollershutter-Öffnung benötigt UP oder 0")
+        validate_feedback(action)
         if action.enabled:
             if not all(re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", s) for s in (action.command_item, action.feedback_item)):
                 raise ValueError("Aktivierte Aktionen benötigen gültige Item-Namen")
-            if action.command_item == action.feedback_item and action.feedback_mode == "state":
-                raise ValueError("Ein separates Geräte-Rückmelde-Item ist erforderlich")
-            if not isinstance(action.command, str) or not action.command or (action.feedback_mode == "state" and not action.success_values):
+            if not isinstance(action.command, str) or not action.command or (action.feedback_mode == "state" and not action.resolved_success_values):
                 raise ValueError("Aktivierte Aktion benötigt Befehl und Erfolgswerte")
         actions.append(action)
     dialog = {"answer_delay_ms": 1000, "listen_timeout_seconds": 8, "max_failures": 2, "max_call_seconds": 120, **raw.get("dialog", {})}
