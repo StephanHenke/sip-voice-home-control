@@ -19,5 +19,6 @@ def identify(remote_uri: str, source: str, host: str, callers: list[Caller], reg
     return next((c for c in callers if c.number == identity), None)
 
 
-def callback_uri(caller: Caller, host: str, port: int) -> str:
-    return f"sip:{caller.number}@{host}:{port}"
+def callback_uri(caller: Caller, host: str, port: int, transport="udp") -> str:
+    suffix = ";transport=tcp" if transport == "tcp" else ""
+    return f"sip:{caller.number}@{host}:{port}{suffix}"

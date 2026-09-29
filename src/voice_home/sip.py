@@ -75,6 +75,7 @@ class Call(pj.Call):
 
     def onCallState(self, prm):
         info = self.getInfo()
+        log.info("sip_call state=%s status=%s", info.stateText, info.lastStatusCode)
         self.engine.events.put(("state", self, info.state))
         if info.state == pj.PJSIP_INV_STATE_DISCONNECTED:
             self.cancelled.set()
@@ -157,10 +158,13 @@ class Account(pj.Account):
         call = Call(self.engine, prm.callId)
         self.engine.calls[prm.callId] = call
         caller = identify(call.getInfo().remoteUri, prm.rdata.srcAddress, self.engine.config.sip["host"], self.engine.config.callers, self.engine.config.region)
+        log.info("sip_incoming peer=%s caller_allowed=%s", prm.rdata.srcAddress, caller is not None)
         if self.engine.probe or caller is None:
+            log.info("sip_rejected reason=%s", "registration_probe" if self.engine.probe else "untrusted_peer_or_number")
             call.end(403)
             return
         if self.engine.busy:
+            log.info("sip_rejected reason=busy")
             call.end(486)
             return
         call.caller = caller
@@ -171,7 +175,15 @@ class Account(pj.Account):
                 return
             self.engine.current = call  # reserve capacity before rejection
             call.callback_trigger = True
-            call.end(486)
+            log.info("callback_trigger_accepted")
+            if self.engine.config.callback["trigger_mode"] == "answer_hangup":
+                op = pj.CallOpParam()
+                op.statusCode = 200
+                op.opt.audioCount = 1
+                op.opt.videoCount = 0
+                call.answer(op)
+            else:
+                call.end(603)  # Global decline; 486 can leave other forked phones ringing.
         else:
             self.engine.current = call
             op = pj.CallOpParam()
@@ -217,7 +229,8 @@ class Engine:
         transport.port = config.sip["local_port"]
         transport.boundAddress = "0.0.0.0"
         transport.publicAddress = config.sip.get("public_address", "")
-        tid = self.endpoint.transportCreate(pj.PJSIP_TRANSPORT_UDP, transport)
+        transport_type = pj.PJSIP_TRANSPORT_TCP if config.sip["transport"] == "tcp" else pj.PJSIP_TRANSPORT_UDP
+        tid = self.endpoint.transportCreate(transport_type, transport)
         self.endpoint.libStart()
         self.endpoint.audDevManager().setNullDev()
         for codec in self.endpoint.codecEnum2():
@@ -226,7 +239,8 @@ class Engine:
         self.account = Account(self)
         ac = pj.AccountConfig()
         host = config.sip["host"]
-        registrar = f"sip:{host}:{config.sip['port']}"
+        transport_suffix = ";transport=tcp" if config.sip["transport"] == "tcp" else ""
+        registrar = f"sip:{host}:{config.sip['port']}{transport_suffix}"
         ac.idUri = f"sip:{config.sip['username']}@{host}"
         ac.regConfig.registrarUri = registrar
         ac.regConfig.retryIntervalSec = 15
@@ -262,7 +276,9 @@ class Engine:
         if kind == "state":
             if value == pj.PJSIP_INV_STATE_CONFIRMED and not call.confirmed:
                 call.confirmed = True
-                if call is self.current and not call.callback_trigger:
+                if call.callback_trigger:
+                    call.end()  # ACK received; BYE ends all ringing before callback.
+                elif call is self.current:
                     call.session = self.dialog.connected(call.caller)
             elif value == pj.PJSIP_INV_STATE_DISCONNECTED:
                 call.disconnected = True
@@ -272,7 +288,7 @@ class Engine:
                         del self.calls[key]
                 if call is self.current:
                     self.current = None
-                    if call.callback_trigger:
+                    if call.callback_trigger and (self.config.callback["trigger_mode"] == "reject" or call.confirmed):
                         self.pending = (time.monotonic() + self.config.callback["delay_ms"] / 1000, call.caller)
         elif kind == "media" and not call.disconnected and not call.callback_trigger:
             call.attach_media()
@@ -307,7 +323,7 @@ class Engine:
                 op.opt.audioCount = 1
                 op.opt.videoCount = 0
                 try:
-                    call.makeCall(callback_uri(caller, self.config.sip["host"], self.config.sip["port"]), op)
+                    call.makeCall(callback_uri(caller, self.config.sip["host"], self.config.sip["port"], self.config.sip["transport"]), op)
                     self.calls[call.getId()] = call
                     log.info("callback_started")
                 except pj.Error:

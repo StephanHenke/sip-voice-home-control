@@ -7,6 +7,7 @@ sip:
   password_file: /run/secrets/sip_password
   port: 5060
   local_port: 5062
+  transport: udp  # Alternativ tcp, z. B. bei Docker Desktop/NAT
   rtp_port: 40000
   # controller_number: "+49..."   # Eigene externe Nummer, niemals Rückrufziel
   # public_address: 192.0.2.20 # Nur falls die automatisch gewählte IP falsch ist
@@ -24,6 +25,7 @@ dialog:
   max_call_seconds: 120
 
 callback:
+  trigger_mode: reject  # answer_hangup: kurz annehmen und vor dem Rückruf auflegen
   delay_ms: 3000
   ring_timeout_seconds: 30
   cooldown_seconds: 60
@@ -77,9 +79,10 @@ actions:
       - "mach {target} auf"
       - "mach das {target} auf"
       - "mach die {target} auf"
-    command_item: ""
-    command: ""
-    feedback_item: ""
+    command_item: GarageDoor
+    command: UP
+    feedback_item: GarageDoor
+    feedback_mode: rollershutter_opening
     success_values: []
     failure_values: []
     timeout_seconds: 10

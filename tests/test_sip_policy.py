@@ -18,6 +18,7 @@ from voice_home.limits import CallbackLimits
 def setup(monkeypatch, tmp_path):
     pj = types.SimpleNamespace(Account=object, Call=object, AudioMediaPort=object, AudioMediaPlayer=object, PJSUA_INVALID_ID=-1, PJSIP_INV_STATE_CONFIRMED=5, PJSIP_INV_STATE_DISCONNECTED=6, PJSIP_REDIRECT_STOP=0)
     monkeypatch.setitem(sys.modules, "pjsua2", pj)
+    pj.CallOpParam = lambda: types.SimpleNamespace(opt=types.SimpleNamespace())
     old = sys.modules.pop("voice_home.sip", None)
     sip = importlib.import_module("voice_home.sip")
     cfg = load(Path(__file__).parents[1] / "config.example.yaml")
@@ -48,6 +49,9 @@ def setup(monkeypatch, tmp_path):
         def end(self, code=200):
             self.code = code
 
+        def answer(self, op):
+            self.answered_with = op.statusCode
+
         def clear_media(self):
             pass
 
@@ -64,7 +68,7 @@ def test_callback_rejects_before_scheduling_and_never_connects_inbound(setup):
     sip, pj, e, account, p, captured = setup
     account.onIncomingCall(p)
     call = captured[0]
-    assert call.code == 486
+    assert call.code == 603
     assert e.pending is None
     assert e.current is call
     e.process_event("state", call, pj.PJSIP_INV_STATE_CONFIRMED)
@@ -87,6 +91,31 @@ def test_parallel_request_gets_busy_without_new_budget(setup):
     assert e.current is original
 
 
+def test_answer_hangup_trigger_has_no_dialog_and_calls_back_after_disconnect(setup):
+    _, pj, e, account, p, calls = setup
+    e.config = replace(e.config, callback={**e.config.callback, "trigger_mode": "answer_hangup"})
+    account.onIncomingCall(p)
+    call = calls[0]
+    assert call.answered_with == 200
+    assert e.pending is None
+    assert not hasattr(call, "code")
+    e.process_event("state", call, pj.PJSIP_INV_STATE_CONFIRMED)
+    assert call.code == 200  # hang up, with no voice session or audio bridge
+    assert call.session is None
+    assert e.pending is None
+    e.process_event("state", call, pj.PJSIP_INV_STATE_DISCONNECTED)
+    assert e.pending[1] is e.config.callers[0]
+
+
+def test_failed_answer_never_starts_callback(setup):
+    _, pj, e, account, p, calls = setup
+    e.config = replace(e.config, callback={**e.config.callback, "trigger_mode": "answer_hangup"})
+    account.onIncomingCall(p)
+    e.process_event("state", calls[0], pj.PJSIP_INV_STATE_DISCONNECTED)
+    assert e.pending is None
+    assert not e.busy
+
+
 @pytest.mark.parametrize("probe,source", [(True, "192.0.2.1:5060"), (False, "192.0.2.2:5060")])
 def test_probe_and_wrong_peer_never_schedule(setup, probe, source):
     _, _, e, account, p, calls = setup
@@ -103,3 +132,13 @@ def test_budget_rejection_never_falls_back_to_direct(setup):
     account.onIncomingCall(p)
     assert calls[0].code == 486
     assert not e.busy
+
+
+@pytest.mark.parametrize("mode", ["callback", "direct"])
+def test_transport_proxy_never_authorizes_caller(setup, mode):
+    _, _, e, account, p, calls = setup
+    e.config = replace(e.config, callers=[replace(e.config.callers[0], access_mode=mode)])
+    p.rdata.srcAddress = "172.17.0.1:41000"
+    account.onIncomingCall(p)
+    assert not calls[0].callback_trigger
+    assert calls[0].code == 403

@@ -3,6 +3,8 @@
 import re
 from .config import Action
 
+STOP_PHRASES = {"nein", "nein danke", "nee", "nee danke", "noe", "noe danke", "auflegen", "bitte auflegen", "abbrechen", "tschuess"}
+YES_PHRASES = {"ja", "ja bitte"}
 
 def normalize(text: str) -> str:
     text = text.casefold().translate(str.maketrans({"ä": "ae", "ö": "oe", "ü": "ue", "ß": "ss"}))
@@ -24,15 +26,15 @@ class Intents:
                     for variant in variants:
                         if variant in self.phrases and self.phrases[variant] != action.id:
                             raise ValueError(f"Mehrdeutiges Sprachmuster: {variant}")
-                        if variant in {"ja", "nein", "auflegen", "abbrechen", "tschüss", "tschuess"}:
+                        if variant in STOP_PHRASES | YES_PHRASES:
                             raise ValueError("Sprachmuster kollidiert mit Dialogwort")
                         self.phrases[variant] = action.id
 
     def parse(self, text: str) -> tuple[str, str | None]:
         text = normalize(text)
-        if text in {"nein", "nein danke", "auflegen", "bitte auflegen", "abbrechen", "tschuess"}:
+        if text in STOP_PHRASES:
             return "stop", None
-        if text in {"ja", "ja bitte"}:
+        if text in YES_PHRASES:
             return "yes", None
         if any(w in text.split() for w in {"nicht", "kein", "keine", "keinen", "niemals", "nein", "unk"}):
             return "unknown", None

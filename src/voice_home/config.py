@@ -49,6 +49,7 @@ class Action:
     command_item: str = ""
     command: str = ""
     feedback_item: str = ""
+    feedback_mode: str = "state"
     success_values: list[str] = field(default_factory=list)
     failure_values: list[str] = field(default_factory=list)
     timeout_seconds: float = 10
@@ -76,8 +77,10 @@ def load(path: str | Path) -> Config:
     if unknown:
         raise ValueError(f"Unbekannte Konfigurationsbereiche: {sorted(unknown)}")
     region = raw.get("region", "DE")
-    sip = {"port": 5060, "local_port": 5062, "rtp_port": 40000, **raw.get("sip", {})}
+    sip = {"port": 5060, "local_port": 5062, "rtp_port": 40000, "transport": "udp", **raw.get("sip", {})}
     ipaddress.IPv4Address(sip["host"])
+    if sip["transport"] not in {"udp", "tcp"}:
+        raise ValueError("sip.transport muss udp oder tcp sein")
     for key in ("port", "local_port", "rtp_port"):
         if type(sip[key]) is not int or not 1024 <= sip[key] <= 65520:
             raise ValueError(f"Ungültiger SIP-Port: {key}")
@@ -117,19 +120,27 @@ def load(path: str | Path) -> Config:
             raise ValueError("Erfolgs- und Fehlerwerte überschneiden sich")
         if {"NULL", "UNDEF"} & set(action.success_values):
             raise ValueError("NULL/UNDEF sind keine Erfolgszustände")
+        if action.feedback_mode not in {"state", "rollershutter_opening"}:
+            raise ValueError("Unbekannter Rückmeldemodus")
+        if action.feedback_mode == "rollershutter_opening" and action.command not in {"UP", "0"}:
+            raise ValueError("Rollershutter-Öffnung benötigt UP oder 0")
         if action.enabled:
             if not all(re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", s) for s in (action.command_item, action.feedback_item)):
                 raise ValueError("Aktivierte Aktionen benötigen gültige Item-Namen")
-            if action.command_item == action.feedback_item:
+            if action.command_item == action.feedback_item and action.feedback_mode == "state":
                 raise ValueError("Ein separates Geräte-Rückmelde-Item ist erforderlich")
-            if not isinstance(action.command, str) or not action.command or not action.success_values:
+            if not isinstance(action.command, str) or not action.command or (action.feedback_mode == "state" and not action.success_values):
                 raise ValueError("Aktivierte Aktion benötigt Befehl und Erfolgswerte")
         actions.append(action)
     dialog = {"answer_delay_ms": 1000, "listen_timeout_seconds": 8, "max_failures": 2, "max_call_seconds": 120, **raw.get("dialog", {})}
-    callback = {"delay_ms": 3000, "ring_timeout_seconds": 30, "cooldown_seconds": 60, "max_attempts_per_number_per_hour": 5, **raw.get("callback", {})}
+    callback = {"trigger_mode": "reject", "delay_ms": 3000, "ring_timeout_seconds": 30, "cooldown_seconds": 60, "max_attempts_per_number_per_hour": 5, **raw.get("callback", {})}
+    if callback["trigger_mode"] not in {"reject", "answer_hangup"}:
+        raise ValueError("callback.trigger_mode muss reject oder answer_hangup sein")
     speech = {"asr_model": "/models/vosk-model-small-de-0.15", "tts_model": "/models/de_DE-thorsten-medium.onnx", "min_confidence": 0.85, "end_silence_ms": 700, **raw.get("speech", {})}
     for settings in (dialog, callback):
         for key, value in settings.items():
+            if key == "trigger_mode":
+                continue
             if type(value) not in (int, float) or not math.isfinite(value) or value < 0 or (key not in {"answer_delay_ms", "delay_ms"} and value == 0):
                 raise ValueError(f"Ungültige Zeit/Grenze: {key}")
     if type(callback["max_attempts_per_number_per_hour"]) is not int or type(dialog["max_failures"]) is not int:

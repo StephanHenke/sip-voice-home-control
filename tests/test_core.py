@@ -52,6 +52,7 @@ def test_number_formats_and_source(config):
     assert identify('"+4915123456789" <sip:anonymous@fritz.box>', "192.0.2.1:5060", "192.0.2.1", config.callers) is None
     assert identify('sip:+4915123456789@fritz.box', "192.0.2.2:5060", "192.0.2.1", config.callers) is None
     assert callback_uri(caller, "192.0.2.1", 5060) == "sip:+4915123456789@192.0.2.1:5060"
+    assert callback_uri(caller, "192.0.2.1", 5060, "tcp") == "sip:+4915123456789@192.0.2.1:5060;transport=tcp"
 
 
 def test_config_blocks_self_callback_and_missing_feedback(tmp_path):
@@ -64,9 +65,31 @@ def test_config_blocks_self_callback_and_missing_feedback(tmp_path):
         load(path)
     raw["callers"] = []
     raw["actions"][1]["enabled"] = True
+    raw["actions"][1]["feedback_item"] = ""
     path.write_text(yaml.safe_dump(raw), encoding="utf-8")
     with pytest.raises(ValueError):
         load(path)
+
+
+def test_transport_proxy_cannot_authorize_call(config):
+    caller = config.callers[0]
+    uri = f"sip:{caller.number}@fritz.box"
+    proxy = "172.17.0.1:41000"
+    assert identify(uri, proxy, "192.0.2.1", [caller]) is None
+    assert identify(uri, proxy, "192.0.2.1", [replace(caller, access_mode="direct")]) is None
+
+
+@pytest.mark.parametrize("transport", ["udp", "tcp", "unsupported"])
+def test_sip_transport_config(tmp_path, transport):
+    raw = yaml.safe_load(EXAMPLE.read_text(encoding="utf-8"))
+    raw["sip"]["transport"] = transport
+    path = tmp_path / "config.yaml"
+    path.write_text(yaml.safe_dump(raw), encoding="utf-8")
+    if transport == "unsupported":
+        with pytest.raises(ValueError):
+            load(path)
+    else:
+        assert load(path).sip["transport"] == transport
 
 
 def test_limits_persist_and_count_failed_attempts(tmp_path):
@@ -127,6 +150,14 @@ def test_low_confidence_silence_and_max_duration(config):
     assert d.tick(s, 120)[0] == "hangup"
 
 
+@pytest.mark.parametrize("text", ["nee danke", "nö", "nein danke"])
+def test_colloquial_refusal_ends_followup(config, text):
+    d = Dialog(config)
+    s = d.connected(config.callers[0], 0)
+    d.listened(s, 1, followup=True)
+    assert d.recognize(s, text, 1) == ("goodbye", "Auf Wiederhören.")
+
+
 def test_event_filter():
     import json
     event = {"type": "ItemStateChangedEvent", "topic": "openhab/items/Door_State/statechanged", "payload": json.dumps({"value": "5", "oldValue": "3"})}
@@ -178,3 +209,48 @@ def test_disabled_action_never_connects(config):
             pytest.fail("disabled action connected")
     oh = OpenHAB({}, client=object(), watch_factory=Never)
     assert oh.execute(config.actions[1], threading.Event()) == "disabled"
+
+
+@pytest.mark.parametrize("auto,value,expected", [("false", "50", "ok"), ("false", "100", "unconfirmed"), ("false", "UNDEF", "unconfirmed"), ("true", "0", "unconfirmed"), (None, "0", "unconfirmed")])
+def test_rollershutter_requires_measured_decreasing_state(config, auto, value, expected):
+    watchers, commands = [], []
+
+    class Watch:
+        def __init__(self, *args):
+            self.events = queue.Queue()
+            self.failed = threading.Event()
+            watchers.append(self)
+        def start(self):
+            pass
+        def close(self):
+            pass
+
+    def handler(request):
+        if request.url.path.endswith('/state'):
+            return httpx.Response(200, text="100")
+        if request.method == "GET":
+            metadata = {} if auto is None else {"autoupdate": {"value": auto}}
+            return httpx.Response(200, json={"type": "Rollershutter", "metadata": metadata})
+        commands.append(request.content)
+        watchers[0].events.put(Feedback(time.monotonic(), value))
+        return httpx.Response(202)
+
+    action = replace(config.actions[1], enabled=True, command_item="GarageDoor", feedback_item="GarageDoor", command="UP", feedback_mode="rollershutter_opening", timeout_seconds=.02)
+    client = httpx.Client(base_url="http://test", transport=httpx.MockTransport(handler))
+    oh = OpenHAB({}, client=client, watch_factory=Watch)
+    assert oh.execute(action, threading.Event()) == expected
+    assert commands == [b"UP"]
+    oh.close()
+
+
+def test_rollershutter_type_mismatch_does_not_send_command(config):
+    requests = []
+    def handler(request):
+        requests.append(request.method)
+        return httpx.Response(200, json={"type": "Switch"})
+    action = replace(config.actions[1], enabled=True, command_item="GarageDoor", feedback_item="GarageDoor", command="UP", feedback_mode="rollershutter_opening")
+    client = httpx.Client(base_url="http://test", transport=httpx.MockTransport(handler))
+    oh = OpenHAB({}, client=client)
+    assert oh.execute(action, threading.Event()) == "failed"
+    assert requests == ["GET"]
+    oh.close()

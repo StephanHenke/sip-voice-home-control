@@ -13,6 +13,7 @@
 - [ ] Beidseitiges Audio mit tatsächlichem SIP/RTP-Netz und Uhr prüfen.
 - [ ] Name passt zur konfigurierten Nummer; unbekannte/unterdrückte Nummer abweisen.
 - [ ] Callback weist eingehenden Anruf ab und wählt nur den gespeicherten Anschluss.
+- [ ] Bei `answer_hangup`: Auslöser kurz annehmen, ohne Dialog auflegen; erst danach Rückruf.
 - [ ] Gefälschte erlaubte Caller-ID ergibt keinen Dialog auf eingehendem Gespräch.
 - [ ] SIP-Redirect/REFER/Replaces erzeugt weder fremdes Ziel noch neuen Dialog.
 - [ ] Ablehnung, Besetzt und Nichterreichbarkeit ergeben keine Aktion/Wahlwiederholung.
@@ -34,6 +35,8 @@
 - [ ] HTTP-Timeout erzeugt keinen erneuten Befehl; spätes Feedback keinen zweiten Versuch.
 - [ ] Haustüraktion unter Aufsicht testen; erst danach dauerhaft aktivieren.
 - [ ] Torwerte ermitteln, Öffnungsbeginn nachweisen; erst danach Toraktion aktivieren.
+- [ ] Bei Rollershutter: UP und reale fallende Prozentposition prüfen; bei demselben
+  Item autoupdate deaktiviert, kein OK für eine vorhergesagte Position.
 - [ ] CPU/RAM sowie p95-Sprechende→Befehl und Feedback→Ansage messen.
 
 Messziel: p95 höchstens 2 s Sprechende→Befehl und 500 ms Feedback→Ansage.

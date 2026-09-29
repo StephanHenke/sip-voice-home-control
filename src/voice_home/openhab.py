@@ -2,6 +2,7 @@
 
 from dataclasses import dataclass
 import json
+import math
 import queue
 import threading
 import time
@@ -78,7 +79,8 @@ class EventWatch:
         self.stop.set()
         if self.response is not None:
             self.response.close()
-        self.thread.join(timeout=0.2)
+        if self.thread.ident is not None:
+            self.thread.join(timeout=0.2)
 
 
 class OpenHAB:
@@ -107,11 +109,26 @@ class OpenHAB:
         watcher = self.watch_factory(self.client, action.feedback_item)
         sent = False
         try:
+            trusted_feedback = True
+            if action.feedback_mode == "rollershutter_opening":
+                item_response = self.client.get(f"/rest/items/{action.feedback_item}", params={"metadata": "autoupdate"})
+                item_response.raise_for_status()
+                item = item_response.json()
+                if item.get("type") != "Rollershutter":
+                    return "failed"
+                if action.command_item == action.feedback_item:
+                    auto = item.get("metadata", {}).get("autoupdate", {}).get("value")
+                    trusted_feedback = str(auto).lower() == "false"
             watcher.start()
             baseline = self.client.get(f"/rest/items/{action.feedback_item}/state")
             baseline.raise_for_status()
             if baseline.text.strip() in {"NULL", "UNDEF"}:
                 return "unconfirmed"
+            initial_percent = None
+            if action.feedback_mode == "rollershutter_opening":
+                initial_percent = float(baseline.text.strip())
+                if not math.isfinite(initial_percent) or not 0 <= initial_percent <= 100:
+                    return "unconfirmed"
             if cancelled.is_set() or watcher.failed.is_set():
                 return "unconfirmed"
             dispatched_at = time.monotonic()
@@ -120,6 +137,10 @@ class OpenHAB:
             if 400 <= response.status_code < 500:
                 return "failed"
             response.raise_for_status()
+            if not trusted_feedback:
+                # An UP command can make autoupdate predict 0 immediately.
+                # The command was sent, but this cannot prove physical movement.
+                return "unconfirmed"
             deadline = dispatched_at + action.timeout_seconds
             while time.monotonic() < deadline and not cancelled.is_set():
                 if watcher.failed.is_set():
@@ -132,6 +153,14 @@ class OpenHAB:
                     continue
                 if event.value in action.failure_values:
                     return "failed"
+                if initial_percent is not None:
+                    try:
+                        current = float(event.value)
+                    except ValueError:
+                        continue
+                    if math.isfinite(current) and 0 <= current < initial_percent:
+                        return "ok"
+                    continue
                 # Reject a pre-existing success state echoed by polling/autoupdate.
                 if event.value in action.success_values and event.value != baseline.text.strip():
                     return "ok"

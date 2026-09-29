@@ -79,6 +79,13 @@ Die Compose-Datei ist für natives Linux vorgesehen. Docker Desktop kann für ei
 Build verwendet werden; seine Netzwerkeinstellungen erfordern für reale Anrufe
 eine eigene Prüfung.
 
+`sip.transport: tcp` verwendet TCP für Registrierung und Rückruf-Signalisierung;
+Audio bleibt RTP/UDP. Bei Docker Desktop den SIP-Port entsprechend als TCP sowie
+die RTP-Ports als UDP veröffentlichen. Docker Desktop ersetzt bei UDP unter Umständen
+die Quell-IP durch seine Gateway-Adresse, wodurch die FRITZ!Box-Prüfung den Anruf
+abweist. Im getesteten Aufbau bleibt über die TCP-Verbindung die FRITZ!Box-Adresse
+erhalten. Die Absenderprüfung bleibt für beide Transportarten aktiv.
+
 ## Anrufer und Rückruf
 
 ```yaml
@@ -89,13 +96,24 @@ callers:
 dialog:
   answer_delay_ms: 1000
 callback:
+  trigger_mode: reject
   delay_ms: 3000
   ring_timeout_seconds: 30
   cooldown_seconds: 60
   max_attempts_per_number_per_hour: 5
 ```
 
-Im Rückrufmodus wird der eingehende Anruf ohne Audio mit „besetzt“ abgewiesen.
+Im Rückrufmodus wird der eingehende Anruf ohne Audio mit SIP 603 „Decline“ abgewiesen.
+Anders als „Busy Here“ (486) signalisiert dies eine globale Ablehnung, damit die
+Telefonanlage weitere parallele Rufzweige beendet. Die konkrete Behandlung durch
+die FRITZ!Box muss beim Testanruf geprüft werden.
+Wenn die Telefonanlage trotzdem weiterklingelt, kann `callback.trigger_mode:
+answer_hangup` gewählt werden. Der Controller nimmt dann ohne Ansage an und legt
+nach bestätigtem Verbindungsaufbau sofort auf. Dabei wird kein Sprachdialog
+gestartet und kein Audio an die Spracherkennung angeschlossen. Erst nach dem
+Auflegen und der Rückrufpause wird die gespeicherte Nummer gewählt. Schlägt die
+Annahme fehl, erfolgt kein Rückruf. Das kurze Annehmen kann tarifabhängig als
+angenommener Anruf berechnet werden.
 Nach dessen Ende und der Rückrufpause wird die konfigurierte Nummer gewählt.
 Erst nach Annahme und Bereitstellung des Audiokanals beginnt die Begrüßungspause. `answer_delay_ms: 0` deaktiviert
 diese zusätzliche Pause. Folgeansagen warten nicht erneut.
@@ -153,6 +171,16 @@ Für die Haustür bestätigt „Falle geöffnet“ die Freigabe; die Person muss
 nicht erst physisch aufdrücken. Für das Garagentor muss ein tatsächlicher Öffnungsbeginn
 konfiguriert werden. Ein reiner Offen-/Geschlossen-Kontakt kann je nach Installation
 diese Aussage nicht liefern.
+
+Für ein Garagentor vom Typ `Rollershutter` unterstützt die Beispielkonfiguration
+`command: UP` mit `feedback_mode: rollershutter_opening`. Eine neue, kleinere
+Prozentposition bestätigt den Öffnungsbeginn (0 = offen, 100 = geschlossen).
+Befehls- und Rückmelde-Item dürfen in diesem Modus identisch sein. In diesem Fall
+muss das Item `autoupdate="false"` haben und seine Updates aus der realen
+Geräterückmeldung beziehen. Ohne explizit ausgeschaltetes autoupdate wird UP zwar
+gesendet, aber eine vorhergesagte Position niemals als Erfolg angesagt; das
+Ergebnis lautet „Die Ausführung konnte nicht bestätigt werden“. Der Controller
+ändert die openHAB-Item-Konfiguration nicht automatisch.
 
 Nach einem Gerätefehler wird „Fehlgeschlagen“ angesagt, nach ausbleibender oder
 unklarer Rückmeldung „Die Ausführung konnte nicht bestätigt werden“. Befehle werden
