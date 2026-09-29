@@ -158,11 +158,21 @@ Jede Aktion hat eine eindeutige `id`, Ziel-Aliase und Satzmuster mit `{target}`.
 „Bitte“ wird automatisch an den Wortgrenzen zugelassen. Andere Wörter werden nicht
 einfach entfernt. Es gibt keinen unscharfen Teilstring-Abgleich.
 
-Es wird das vollständige ASR-Ergebnis geprüft. Ein eingeschränktes Wörterbuch wird
-bewusst nicht erzwungen, damit „nicht öffnen“ oder Fremdgespräche nicht automatisch
-auf einen erlaubten Befehl projiziert werden. Niedrige Wortkonfidenz führt zur
-Nachfrage. `min_confidence` ist ein Startwert und muss mit realen Stimmen geprüft werden.
-Negationen, unbekannte Ziele und mehrere Aktionen in einem Satz führen zu keiner Aktion.
+Mit `speech.command_vocabulary: true` wird der Wortschatz aus den YAML-Aliasen und
+Satzmustern abgeleitet. Einzelne Wörter statt fest erzwungener Befehlssätze erlauben
+auch andere Wortfolgen; Verneinungen, Gegenbefehle und ein Marker für unbekannte
+Wörter bleiben enthalten. Das verbessert die Erkennung kurzer Befehle beim
+Freisprechen. Ein parallel laufender uneingeschränkter Vosk-Erkenner prüft zusätzlich
+auf Verneinungen und Abbruch. Ein bestätigendes „Ja“ muss von beiden Erkennern
+erkannt werden. Widersprüchlich erkannte, konfigurierte Ziele führen zur Nachfrage.
+Mit `false` wird ausschließlich der uneingeschränkte Erkenner benutzt.
+
+Weiterhin muss das vollständige Ergebnis einem konfigurierten Sprachmuster
+entsprechen. Niedrige Wortkonfidenz führt zur Nachfrage. `min_confidence` ist ein
+Startwert, keine gemessene Fehlerwahrscheinlichkeit; reale Stimmen und Umgebungen
+müssen getestet werden. Negationen, unbekannte Ziele und mehrere Aktionen in einem
+Satz führen zu keiner Aktion. Zur Technik siehe die
+[Vosk-Dokumentation zur Wortschatzanpassung](https://alphacephei.com/vosk/adaptation).
 
 Beispiel einer später ergänzten Lichtaktion:
 
@@ -257,6 +267,11 @@ docker run --rm --network none --read-only --tmpfs /tmp:size=128m \
   --cpus 2 --memory 2g --entrypoint python sip-voice-home-control:local \
   /app/scripts/smoke_runtime.py
 ```
+
+Mit `/app/scripts/verify_speech.py` anstelle von `smoke_runtime.py` prüft derselbe
+Aufruf zusätzlich synthetische Befehle, Verneinungen, Gegenbefehle, Fremdaussagen,
+Ja/Nein, Stille und Signalton mit dem angepassten Wortschatz. Er sendet keine
+SIP-Anrufe oder Gerätebefehle.
 
 Vor Gerätefreigabe: [Abnahmecheckliste](docs/ACCEPTANCE.md) und
 [vereinbarte Anforderungen](docs/REQUIREMENTS.md) durchgehen. Zielwerte sind

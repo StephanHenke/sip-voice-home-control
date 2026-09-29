@@ -29,3 +29,5 @@ jobs:
           cache-to: type=gha,mode=max
       - name: Verify native audio and offline speech
         run: docker run --rm --network none --read-only --tmpfs /tmp:size=128m --cpus 2 --memory 2g --entrypoint python sip-voice-home-control:ci /app/scripts/smoke_runtime.py
+      - name: Verify commands, refusals and noise with native speech recognition
+        run: docker run --rm --network none --read-only --tmpfs /tmp:size=128m --cpus 2 --memory 2g --entrypoint python sip-voice-home-control:ci /app/scripts/verify_speech.py

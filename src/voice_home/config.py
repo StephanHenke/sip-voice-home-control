@@ -194,7 +194,9 @@ def load(path: str | Path) -> Config:
     callback = {"trigger_mode": "reject", "delay_ms": 3000, "ring_timeout_seconds": 30, "cooldown_seconds": 60, "max_attempts_per_number_per_hour": 5, **raw.get("callback", {})}
     if callback["trigger_mode"] not in {"reject", "answer_hangup"}:
         raise ValueError("callback.trigger_mode muss reject oder answer_hangup sein")
-    speech = {"asr_model": "/models/vosk-model-small-de-0.15", "tts_model": "/models/de_DE-thorsten-medium.onnx", "min_confidence": 0.85, "end_silence_ms": 700, **raw.get("speech", {})}
+    speech = {"asr_model": "/models/vosk-model-small-de-0.15", "tts_model": "/models/de_DE-thorsten-medium.onnx", "command_vocabulary": True, "min_confidence": 0.85, "end_silence_ms": 700, **raw.get("speech", {})}
+    if type(speech["command_vocabulary"]) is not bool:
+        raise ValueError("speech.command_vocabulary muss true oder false sein")
     for settings in (dialog, callback):
         for key, value in settings.items():
             if key == "trigger_mode":

@@ -37,6 +37,7 @@ openhab:
   token_file: /run/secrets/openhab_token
 
 speech:
+  command_vocabulary: true
   asr_model: /models/vosk-model-small-de-0.15
   tts_model: /models/de_DE-thorsten-medium.onnx
   min_confidence: 0.85

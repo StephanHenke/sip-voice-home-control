@@ -208,7 +208,7 @@ class Engine:
         self.stopping = False
         self.pool = ThreadPoolExecutor(max_workers=1)
         self.limits = CallbackLimits(config.data_dir / "callbacks.sqlite", config.callback["cooldown_seconds"], config.callback["max_attempts_per_number_per_hour"])
-        self.speech = None if probe else Speech(config.speech, config.data_dir / "prompts", self.dialog.prompts())
+        self.speech = None if probe else Speech(config.speech, config.data_dir / "prompts", self.dialog.prompts(), config.actions)
         self.openhab = None if probe else OpenHAB(config.openhab)
         self.endpoint = pj.Endpoint()
         self.endpoint.libCreate()
