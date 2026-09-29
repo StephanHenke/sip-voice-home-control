@@ -84,10 +84,21 @@ def test_answer_delay_and_name(config, delay):
     cfg = replace(config, dialog={**config.dialog, "answer_delay_ms": delay})
     d = Dialog(cfg)
     s = d.connected(cfg.callers[0], 100)
+    d.media_ready(s, 100)
     if delay:
         assert d.tick(s, 100 + delay / 1000 - .001) is None
     assert d.tick(s, 100 + delay / 1000)[1].startswith("Hallo Anna,")
     assert d.tick(s, 110) is None
+
+
+def test_answer_pause_waits_for_audio_readiness(config):
+    d = Dialog(config)
+    s = d.connected(config.callers[0], 100)
+    assert d.tick(s, 104) is None
+    d.media_ready(s, 104)
+    d.media_ready(s, 104.5)  # later media notifications cannot restart the pause
+    assert d.tick(s, 104.999) is None
+    assert d.tick(s, 105)[1].startswith("Hallo Anna,")
 
 
 def test_multiple_actions_no_and_no_duplicates(config):

@@ -6,7 +6,7 @@ permissions:
   contents: read
 jobs:
   tests:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -16,7 +16,7 @@ jobs:
       - run: pytest -q
       - run: voice-home --config config.example.yaml validate
   container:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
       - uses: docker/setup-buildx-action@v3
@@ -27,5 +27,5 @@ jobs:
           tags: sip-voice-home-control:ci
           cache-from: type=gha
           cache-to: type=gha,mode=max
-      - name: Verify native runtime imports
-        run: docker run --rm --entrypoint python sip-voice-home-control:ci -c "import pjsua2, vosk, piper; import voice_home.sip"
+      - name: Verify native audio and offline speech
+        run: docker run --rm --network none --read-only --tmpfs /tmp:size=128m --cpus 2 --memory 2g --entrypoint python sip-voice-home-control:ci /app/scripts/smoke_runtime.py

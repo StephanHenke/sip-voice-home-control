@@ -21,11 +21,12 @@ RUN apt-get update && apt-get install -y --no-install-recommends libssl3 libopus
 COPY --from=pjsip-build /wheels /wheels
 RUN pip install --no-cache-dir /wheels/*.whl && rm -rf /wheels
 WORKDIR /app
+COPY scripts/download_models.py /app/scripts/download_models.py
+RUN python /app/scripts/download_models.py
 COPY pyproject.toml ./
 COPY src ./src
 RUN pip install --no-cache-dir '.[voice]'
-COPY scripts/download_models.py /app/scripts/download_models.py
-RUN python /app/scripts/download_models.py
+COPY scripts/smoke_runtime.py /app/scripts/smoke_runtime.py
 USER controller
 ENV PYTHONUNBUFFERED=1 OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1
 ENTRYPOINT ["voice-home"]

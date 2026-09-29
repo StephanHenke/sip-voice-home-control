@@ -10,6 +10,8 @@ import wave
 
 class Speech:
     def __init__(self, config: dict, cache: Path, prompts: set[str]):
+        import onnxruntime
+        onnxruntime.disable_telemetry_events()
         from vosk import Model, SetLogLevel
         from piper import PiperVoice
         SetLogLevel(-1)

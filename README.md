@@ -8,6 +8,7 @@ Ausgelegt für kurze deutsche Befehle, beispielsweise von einer Xplora-Uhr.
 Die reale SIP-/RTP-Verbindung, Verständlichkeit an der Uhr und physische
 Geräterückmeldungen müssen vor dem produktiven Einsatz abgenommen werden.
 Alle Aktionen und Anruferfreigaben sind in der Beispielkonfiguration deaktiviert.
+Bereits durchgeführte Prüfungen stehen in [VALIDATION.md](docs/VALIDATION.md).
 
 ## Funktionen
 
@@ -36,6 +37,8 @@ install -m 600 /dev/null secrets/sip_password
 install -m 600 /dev/null secrets/openhab_token
 # Secret-Dateien mit einem Editor befüllen; Passwörter nicht in Befehlszeilen schreiben.
 # config.yaml bearbeiten: SIP, openHAB und freigegebene Anrufer eintragen.
+# Der Container läuft mit UID 10001; Secret-Dateien müssen für diese UID lesbar sein.
+sudo chown 10001:10001 secrets/sip_password secrets/openhab_token
 docker compose build
 docker compose run --rm controller validate
 docker compose run --rm controller doctor
@@ -94,7 +97,7 @@ callback:
 
 Im Rückrufmodus wird der eingehende Anruf ohne Audio mit „besetzt“ abgewiesen.
 Nach dessen Ende und der Rückrufpause wird die konfigurierte Nummer gewählt.
-Erst nach Annahme beginnt die Begrüßungspause. `answer_delay_ms: 0` deaktiviert
+Erst nach Annahme und Bereitstellung des Audiokanals beginnt die Begrüßungspause. `answer_delay_ms: 0` deaktiviert
 diese zusätzliche Pause. Folgeansagen warten nicht erneut.
 
 Fehlschläge zählen zum Rückruflimit. Es gibt keine Wahlwiederholung, keinen
@@ -168,8 +171,15 @@ voice-home --config config.example.yaml parse 'schließe die Tür auf'
 ```
 
 Die Tests ohne native Bibliotheken prüfen Parser, Konfiguration, Gesprächsablauf,
-Rückruflimits und openHAB-Fehlerfälle. GitHub Actions führt zusätzlich einen
-Container-Build und einen Importtest der nativen Laufzeit aus.
+Rückruflimits und openHAB-Fehlerfälle. Der GitHub-Actions-Workflow enthält zusätzlich
+einen Container-Build und einen Offline-Test mit echter TTS, ASR und PJSIP-Audio.
+Dieser Test ist auch lokal ausführbar:
+
+```bash
+docker run --rm --network none --read-only --tmpfs /tmp:size=128m \
+  --cpus 2 --memory 2g --entrypoint python sip-voice-home-control:local \
+  /app/scripts/smoke_runtime.py
+```
 
 Vor Gerätefreigabe: [Abnahmecheckliste](docs/ACCEPTANCE.md) und
 [vereinbarte Anforderungen](docs/REQUIREMENTS.md) durchgehen. Zielwerte sind

@@ -11,7 +11,7 @@ from .intents import Intents
 class Session:
     caller: Caller
     connected_at: float
-    state: str = "answer_delay"
+    state: str = "waiting_media"
     deadline: float = 0
     used: set[str] = field(default_factory=set)
     failures: int = 0
@@ -25,7 +25,17 @@ class Dialog:
 
     def connected(self, caller: Caller, now: float | None = None) -> Session:
         now = time.monotonic() if now is None else now
-        return Session(caller, now, deadline=now + self.config.dialog["answer_delay_ms"] / 1000)
+        return Session(caller, now)
+
+    def media_ready(self, s: Session, now: float):
+        if s.state == "waiting_media":
+            s.state = "answer_delay"
+            s.deadline = now + self.config.dialog["answer_delay_ms"] / 1000
+
+    def greeting(self, caller: Caller) -> str:
+        names = ", ".join(a.aliases[0] for a in self.config.actions if a.enabled)
+        suffix = f" Verfügbar sind: {names}." if names else " Aktuell ist noch keine Aktion eingerichtet."
+        return f"Hallo {caller.name}, was möchtest du tun?{suffix}"
 
     def tick(self, s: Session, now: float) -> tuple[str, str] | None:
         if now - s.connected_at >= self.config.dialog["max_call_seconds"]:
@@ -33,9 +43,7 @@ class Dialog:
             return "hangup", ""
         if s.state == "answer_delay" and now >= s.deadline:
             s.state = "speaking"
-            names = ", ".join(a.aliases[0] for a in self.config.actions if a.enabled)
-            suffix = f" Verfügbar sind: {names}." if names else " Aktuell ist noch keine Aktion eingerichtet."
-            return "say", f"Hallo {s.caller.name}, was möchtest du tun?{suffix}"
+            return "say", self.greeting(s.caller)
         if s.state in {"listening", "followup"} and now >= s.deadline:
             return self.misunderstood(s)
         return None
@@ -85,8 +93,7 @@ class Dialog:
     def prompts(self) -> set[str]:
         texts = {"Auf Wiederhören.", "Ich konnte dich nicht verstehen. Auf Wiederhören.", "Bitte nenne eine Aktion, zum Beispiel Haustür öffnen.", "Was möchtest du tun?", "Diese Aktion ist noch nicht eingerichtet. Möchtest du noch etwas?", "Diese Aktion wurde bereits angefordert. Möchtest du noch etwas?"}
         for caller in self.config.callers:
-            s = self.connected(caller, 0)
-            texts.add(self.tick(s, self.config.dialog["answer_delay_ms"] / 1000)[1])
+            texts.add(self.greeting(caller))
         for action in self.config.actions:
             for result in ("ok", "failed", "unconfirmed", "disabled"):
                 dummy = Session(Caller("", ""), 0)

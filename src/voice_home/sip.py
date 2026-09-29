@@ -339,6 +339,7 @@ class Engine:
             if now - call.session.connected_at > 10:
                 call.end()
             return
+        self.dialog.media_ready(call.session, now)
         if call.listen_at is not None and now >= call.listen_at:
             call.listen_at = None
             while not call.audio.empty():
