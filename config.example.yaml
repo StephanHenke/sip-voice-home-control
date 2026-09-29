@@ -105,3 +105,32 @@ actions:
     success_text: "OK, das Garagentor öffnet sich."
     require_confirmation: false
     confirmation_text: "Soll ich das Garagentor öffnen?"
+
+  - id: garage_close
+    enabled: false
+    aliases: ["Garagentor", "Garage"]
+    patterns:
+      - "schließe {target}"
+      - "schließe das {target}"
+      - "schließe die {target}"
+      - "{target} schließen"
+      - "das {target} schließen"
+      - "die {target} schließen"
+      - "mach {target} zu"
+      - "mach das {target} zu"
+      - "mach die {target} zu"
+    command_item: GarageDoor
+    command: DOWN
+    feedback_item: GarageDoor_ActualState
+    feedback_mode: state
+    # Beispielwerte: an die tatsächliche Geräterückmeldung anpassen.
+    state_values:
+      closed: ["1"]
+      opening: ["3"]
+      open: ["2"]
+    success_states: [closed]  # Bestätigt die Endlage, nicht nur die Bewegung.
+    failure_states: []
+    timeout_seconds: 45       # Muss die vollständige Fahrzeit abdecken.
+    success_text: "OK, das Garagentor ist geschlossen."
+    require_confirmation: false
+    confirmation_text: "Soll ich das Garagentor schließen?"

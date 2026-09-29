@@ -155,6 +155,10 @@ Alle Ansagen und Verzweigungen zeigt das [Gesprächsdiagramm](docs/CALL_FLOW.md)
 Item-Zuordnung, Statuswerte, Invertierung und Ein-Item-Betrieb stehen in
 [YAML-Konfiguration der Geräte](docs/DEVICE_CONFIGURATION.md).
 Jede Aktion hat eine eindeutige `id`, Ziel-Aliase und Satzmuster mit `{target}`.
+Das Beispiel enthält Haustüröffnung sowie getrennte Aktionen zum Öffnen und
+Schließen der Garage (`UP`/`DOWN`). „Garagentor schließen“, „schließe das
+Garagentor“ und „mach die Garage zu“ gehören zu den Schließbefehlen. Das Schließen
+wird im Beispiel erst bei bestätigter geschlossener Endlage mit OK beantwortet.
 „Bitte“ wird automatisch an den Wortgrenzen zugelassen. Andere Wörter werden nicht
 einfach entfernt. Es gibt keinen unscharfen Teilstring-Abgleich.
 

@@ -58,7 +58,7 @@ flowchart TD
     ConfirmFailures -- Nein --> ConfirmRetry["Bitte antworte mit Ja oder Nein.<br/>{confirmation_text}"]
     ConfirmRetry --> ConfirmBeep
     Execute --> Result{Ergebnis}
-    Result -- Erfolg bestätigt --> Success["{success_text}<br/>z. B. OK, das Garagentor öffnet sich.<br/>oder OK, die Haustür ist freigegeben."]
+    Result -- Erfolg bestätigt --> Success["{success_text}<br/>z. B. OK, das Garagentor öffnet sich.<br/>OK, das Garagentor ist geschlossen.<br/>oder OK, die Haustür ist freigegeben."]
     Result -- Fehler festgestellt --> Failed["Fehlgeschlagen."]
     Result -- Unklar / keine neue Bestätigung --> Unconfirmed["Die Ausführung konnte<br/>nicht bestätigt werden."]
     Result -- Aktion deaktiviert --> Disabled

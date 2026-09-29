@@ -73,6 +73,26 @@ Ein Rohwertwechsel zwischen zwei Werten desselben benannten Zustands gilt nicht
 als neuer Erfolg. War das Tor bereits offen, ergibt ein erneut gemeldetes „offen“
 keine neue Erfolgsbestätigung.
 
+## Garagentor schließen
+
+`config.example.yaml` enthält dafür die separate Aktion `garage_close`.
+Sie verwendet dasselbe Befehls-Item wie `garage_open`, sendet aber `DOWN`.
+Unter anderem werden „Garagentor schließen“, „schließe das Garagentor“ und
+„mach die Garage zu“ erkannt. Die Bestätigungsfrage lässt sich wie bei jeder
+anderen Aktion einzeln einschalten.
+
+Die Beispielkonfiguration bestätigt erst eine neue tatsächliche Rückmeldung
+`closed` und sagt dann „OK, das Garagentor ist geschlossen.“. Die Wartezeit von
+45 Sekunden muss zur vollständigen Fahrzeit passen. Ein bereits vorher
+geschlossener Zustand ist kein neuer Erfolgsnachweis. Bei ausbleibender Rückmeldung
+folgt „Die Ausführung konnte nicht bestätigt werden.“.
+
+Wenn das Gerät einen verifizierten eigenen Status für die Schließbewegung liefert,
+kann er als `closing` in `state_values` ergänzt werden. Mit
+`success_states: [closing, closed]` und
+`success_text: "OK, das Garagentor schließt sich."` wird dann bereits die Bewegung
+bestätigt. Die Rohwerte dafür müssen aus der jeweiligen Installation stammen.
+
 ## Kontaktstatus umkehren
 
 Für einen Kontakt, der bei tatsächlich offener Tür `CLOSED` liefert, wird die

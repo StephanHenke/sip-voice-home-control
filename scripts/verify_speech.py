@@ -14,14 +14,16 @@ phrases = {
     'Garagentor öffnen.': 'action', 'Ja.': 'yes', 'Nein.': 'stop',
     'Haustür nicht öffnen.': 'unknown', 'Nicht die Tür öffnen.': 'unknown',
     'Öffne die Haustür nicht.': 'unknown', 'Die Haustür bleibt zu.': 'unknown',
-    'Garagentor schließen.': 'unknown', 'Die Tür ist schon offen.': 'unknown',
+    'Garagentor schließen.': 'action', 'Die Tür ist schon offen.': 'unknown',
+    'Garagentor nicht schließen.': 'unknown',
     'Ich habe Haustür öffnen gesagt.': 'unknown', 'Öffne das Fenster.': 'unknown',
     'Haustür öffnen und Garage öffnen.': 'unknown', 'Nein, nicht öffnen.': 'unknown',
     'Vielleicht morgen die Haustür öffnen.': 'unknown', 'Was gibt es zum Mittagessen?': 'unknown',
     'Auf Wiedersehen.': 'unknown', 'Abbrechen.': 'stop',
 }
 targets = {'Haustür öffnen.': 'front_door_open', 'Tür öffnen.': 'front_door_open',
-           'Öffne die Haustür.': 'front_door_open', 'Garagentor öffnen.': 'garage_open'}
+           'Öffne die Haustür.': 'front_door_open', 'Garagentor öffnen.': 'garage_open',
+           'Garagentor schließen.': 'garage_close'}
 config = load(Path(__file__).parents[1] / 'config.example.yaml')
 parser = Intents(config.actions)
 failures = []
