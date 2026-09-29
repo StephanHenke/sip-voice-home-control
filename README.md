@@ -22,7 +22,8 @@ Bereits durchgeführte Prüfungen stehen in [VALIDATION.md](docs/VALIDATION.md).
 - Bestätigung erst nach einer neuen openHAB-Geräterückmeldung; ein gemeinsames
   Befehls-/Status-Item ist mit deaktiviertem autoupdate ebenfalls möglich.
 - Item-Namen, Statusbedeutung und normale/invertierte Prozentwerte vollständig in YAML.
-- Mehrere unterschiedliche Aktionen je Gespräch; „Nein“ beendet den Dialog.
+- Aktionen im selben Gespräch beliebig erneut anfordern; „Nein“ beendet die Folgefrage.
+- Optionale Bestätigungsfrage je Aktion; Ausführung erst nach einem expliziten „Ja“.
 - Erweiterung um Lichtaktionen über Konfiguration, ohne ein Sprachmodell umzuprogrammieren.
 
 ## Schnellstart auf Linux (amd64)
@@ -163,6 +164,21 @@ Beispiel einer später ergänzten Lichtaktion:
 Ein-/Ausschalten werden als getrennte Aktionen konfiguriert. Sprachmuster dürfen
 nicht mehrere Aktionen gleichzeitig bezeichnen. Das wird beim Start geprüft.
 
+Jede Aktion kann vor der Ausführung eine eigene Bestätigungsfrage stellen:
+
+```yaml
+require_confirmation: true
+confirmation_text: "Soll ich die Haustür entriegeln und die Falle ziehen?"
+```
+
+Ohne `require_confirmation` oder mit `false` wird direkt ausgeführt. Bei `true`
+ist ein nichtleerer Fragetext erforderlich. Nach Frage und Signalton bestätigt
+„Ja“ oder „Ja bitte“ die angefragte Aktion. „Nein“ oder „Abbrechen“ verwirft sie und
+führt zur Folgefrage. „Auflegen“ beendet das Gespräch. Unklare Antworten und
+Schweigen lösen keinen Befehl aus; die Frage wird bis zur konfigurierten
+Fehlergrenze erneut gestellt. Eine neue Anforderung derselben Aktion benötigt
+erneut eine Bestätigung, falls diese für die Aktion eingeschaltet ist.
+
 ## Rückmeldungen richtig anschließen
 
 Ein HTTP-Status 200/202 bestätigt nur die Annahme eines Befehls. Der Controller
@@ -197,8 +213,9 @@ Ergebnis lautet „Die Ausführung konnte nicht bestätigt werden“. Der Contro
 
 Nach einem Gerätefehler wird „Fehlgeschlagen“ angesagt, nach ausbleibender oder
 unklarer Rückmeldung „Die Ausführung konnte nicht bestätigt werden“. Befehle werden
-auch nach Netzwerkfehlern nicht automatisch wiederholt. Dieselbe Aktion wird pro
-Gespräch höchstens einmal angefordert.
+auch nach Netzwerkfehlern nicht automatisch wiederholt. Der Anrufer darf dieselbe
+Aktion im selben Gespräch erneut anfordern; jeder bestätigte Auftrag sendet genau
+einen Befehl. Während Ansagen oder laufender Ausführung wird nicht zugehört.
 
 ## Entwicklung und Abnahme
 

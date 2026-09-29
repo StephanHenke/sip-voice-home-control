@@ -1,8 +1,10 @@
 """Exercise the actual SIP policy adapter with a minimal native-API test double."""
 
 import importlib
+import queue
 import sys
 import threading
+import time
 import types
 from dataclasses import replace
 from pathlib import Path
@@ -142,3 +144,42 @@ def test_transport_proxy_never_authorizes_caller(setup, mode):
     account.onIncomingCall(p)
     assert not calls[0].callback_trigger
     assert calls[0].code == 403
+
+
+@pytest.mark.parametrize("disconnected", [False, True])
+def test_question_playback_and_beep_preserve_confirmation_until_explicit_yes(setup, disconnected):
+    _, _, e, _, _, _ = setup
+    action = replace(e.config.actions[0], enabled=True, require_confirmation=True,
+                     confirmation_text="Soll ich die Haustür öffnen?")
+    e.dialog = Dialog(replace(e.config, actions=[action]))
+    e.endpoint = types.SimpleNamespace(libHandleEvents=lambda _: None)
+    e.events = queue.Queue()
+    e.speech = types.SimpleNamespace(path=lambda text: text, beep="beep", reset=lambda: None)
+    submitted = []
+    e.openhab = types.SimpleNamespace(execute=lambda *_: None)
+    e.pool = types.SimpleNamespace(submit=lambda *args: submitted.append(args))
+    call = types.SimpleNamespace(
+        session=e.dialog.connected(e.config.callers[0]), cancelled=threading.Event(),
+        confirmed=True, media=object(), audio=queue.Queue(), listen_at=None,
+        listening=False, followup=False,
+    )
+    def play(path, after):
+        call.player = types.SimpleNamespace(after=after, stopTransmit=lambda _: None)
+    call.play = play
+    e.current = call
+    e.dialog.listened(call.session, time.monotonic())
+    e.dispatch(call, e.dialog.recognize(call.session, "Haustür öffnen", 1))
+    assert not submitted
+    e.process_event("playback", call, call.player)  # question -> beep
+    e.process_event("playback", call, call.player)  # beep -> guarded listening
+    call.listen_at = time.monotonic() - 1
+    e.step()
+    assert call.listening
+    assert call.session.state == "confirming"
+    assert not submitted
+    if disconnected:
+        call.cancelled.set()
+    e.dispatch(call, e.dialog.recognize(call.session, "ja", 1))
+    assert len(submitted) == (0 if disconnected else 1)
+    if submitted:
+        assert submitted[0][1].id == action.id

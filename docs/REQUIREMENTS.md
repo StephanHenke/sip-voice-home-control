@@ -3,6 +3,7 @@
 - Ein Docker-Container auf Linux/amd64; lokale CPU-Verarbeitung ohne LLM/GPU.
 - FRITZ!Box als SIP-Registrar, separate Controller-Rufnummer und explizite Anruferliste.
 - Rufnummer und Name werden in einem Eintrag verknüpft. Der Name kommt aus der Konfiguration.
+- Begrüßung ohne Aufzählung der verfügbaren Ziele.
 - `callback` ist pro Nummer der Standard, `direct` ist ausdrücklich möglich.
 - Im Rückrufmodus eingehenden Anruf abweisen, anschließend ausschließlich die gespeicherte
   Nummer zurückrufen. Dialog nur auf diesem Rückruf, keine automatische Wiederholung.
@@ -20,7 +21,11 @@
   „Ja“ fragt nach, „Nein“/„Auflegen“ beendet den Anruf.
 - Acht Sekunden Eingabewartezeit, zwei Fehlversuche, maximal 120 Sekunden Gespräch.
 - Keine Aktionen während der Ansage, Bereitschaftston vor der Eingabe.
-- Jede Aktion höchstens einmal pro Gespräch, kein automatischer Wiederholungsversand.
+- Dieselbe Aktion darf im Gespräch mehrfach neu angefordert werden; kein automatischer Wiederholungsversand.
+- Optionale Bestätigungsfrage je Aktion, konfigurierbar mit eigenem Text. Nur ein
+  explizites Ja führt aus; Nein/Abbrechen verwirft den Auftrag und bietet weitere
+  Aktionen an. Auflegen beendet das Gespräch. Jede neue Anforderung wird erneut
+  bestätigt, wenn die Bestätigungsfrage eingeschaltet ist.
 - Persönliche Konfiguration und Secrets außerhalb von Git und Docker-Build-Kontext.
 - Abnahme auf realer Uhr; keine Zusage tatsächlicher Reaktionszeiten vor Messung.
 

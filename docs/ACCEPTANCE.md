@@ -30,6 +30,9 @@
 - [ ] Negationen, Fremdsprache, Hintergrundstimmen, Ansage-Echos und Kombinationsbefehle
   lösen keine Aktion aus. Reine Mailboxansage ergibt keine Aktion.
 - [ ] Beide Aktionen nacheinander, direkter Folgeauftrag, Ja/Nein, Schweigen und Timeout.
+- [ ] Dieselbe Aktion mehrfach neu anfordern; bei aktivierter Bestätigungsfrage jedes Mal neu bestätigen.
+- [ ] Vor explizitem Ja zur Bestätigungsfrage kein Gerätebefehl. Nein/Abbrechen,
+  unsicheres Ja, andere Aktionen, Schweigen und Auflegen führen nicht zur Ausführung.
 - [ ] Rückmeldung kommt aus dem Gerät und nicht aus autoupdate/Befehlsspiegelung.
 - [ ] Kein OK bei altem Zustand, HTTP-Erfolg allein, fehlender Rückmeldung oder Motorfehler.
 - [ ] HTTP-Timeout erzeugt keinen erneuten Befehl; spätes Feedback keinen zweiten Versuch.

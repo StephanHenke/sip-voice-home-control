@@ -124,7 +124,7 @@ def test_answer_pause_waits_for_audio_readiness(config):
     assert d.tick(s, 105)[1].startswith("Hallo Anna,")
 
 
-def test_multiple_actions_no_and_no_duplicates(config):
+def test_repeated_action_and_followup_no(config):
     d = Dialog(config)
     s = d.connected(config.callers[0], 0)
     d.listened(s, 1)
@@ -135,7 +135,8 @@ def test_multiple_actions_no_and_no_duplicates(config):
     d.listened(s, 2, True)
     assert d.recognize(s, "ja", .99) == ("say", "Was möchtest du tun?")
     d.listened(s, 3)
-    assert d.recognize(s, "Tür öffnen", .99)[0] == "followup"
+    assert d.recognize(s, "Tür öffnen", .99) == ("execute", "front_door_open")
+    d.result(s, "front_door_open", "ok")
     d.listened(s, 4, True)
     assert d.recognize(s, "nein", .99)[0] == "goodbye"
 

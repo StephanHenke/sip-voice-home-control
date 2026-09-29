@@ -65,6 +65,8 @@ actions:
     failure_values: ["254"]
     timeout_seconds: 10
     success_text: "OK, die Haustür ist freigegeben."
+    require_confirmation: false  # true: erst nach explizitem Ja ausführen
+    confirmation_text: "Soll ich die Haustür entriegeln und die Falle ziehen?"
 
   - id: garage_open
     enabled: false
@@ -99,3 +101,5 @@ actions:
     # closed_position: 100 # Invertiert: 0
     timeout_seconds: 10
     success_text: "OK, das Garagentor öffnet sich."
+    require_confirmation: false
+    confirmation_text: "Soll ich das Garagentor öffnen?"

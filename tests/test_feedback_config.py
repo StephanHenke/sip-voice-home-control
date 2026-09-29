@@ -63,7 +63,8 @@ def execute(action, baseline, event, *, auto="false", stale=False, item_type="Ro
 
     with httpx.Client(base_url="http://test", transport=httpx.MockTransport(handler)) as client:
         oh = OpenHAB({}, client=client, watch_factory=Watch)
-        result = oh.execute(replace(action, timeout_seconds=.01), threading.Event())
+        # Allow normal Windows scheduler jitter while the Docker build runs.
+        result = oh.execute(replace(action, timeout_seconds=.2), threading.Event())
     return result, sum(r.method == "POST" for r in requests)
 
 

@@ -3,7 +3,8 @@
 import re
 from .config import Action
 
-STOP_PHRASES = {"nein", "nein danke", "nee", "nee danke", "noe", "noe danke", "auflegen", "bitte auflegen", "abbrechen", "tschuess"}
+NO_PHRASES = {"nein", "nein danke", "nee", "nee danke", "noe", "noe danke"}
+STOP_PHRASES = NO_PHRASES | {"auflegen", "bitte auflegen", "abbrechen", "tschuess"}
 YES_PHRASES = {"ja", "ja bitte"}
 
 def normalize(text: str) -> str:

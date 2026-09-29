@@ -59,6 +59,8 @@ class Action:
     failure_states: list[str] = field(default_factory=list)
     open_position: float = 0
     closed_position: float = 100
+    require_confirmation: bool = False
+    confirmation_text: str = ""
 
     @property
     def resolved_success_values(self) -> set[str]:
@@ -171,6 +173,10 @@ def load(path: str | Path) -> Config:
         ids.add(action.id)
         if not action.aliases or not action.patterns or type(action.enabled) is not bool:
             raise ValueError("Aktion benötigt Aliase, Satzmuster und boolesches enabled")
+        if type(action.require_confirmation) is not bool or not isinstance(action.confirmation_text, str):
+            raise ValueError("Bestätigung benötigt boolesches require_confirmation und einen Fragetext als String")
+        if action.require_confirmation and not action.confirmation_text.strip():
+            raise ValueError("Bei require_confirmation=true ist confirmation_text erforderlich")
         if not all(isinstance(s, str) and s.strip() for s in action.aliases + action.patterns):
             raise ValueError("Leere/ungültige Sprachmuster")
         if any(p.count("{target}") != 1 or "{" in p.replace("{target}", "") or "}" in p.replace("{target}", "") for p in action.patterns):

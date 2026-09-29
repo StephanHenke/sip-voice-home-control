@@ -9,6 +9,29 @@ Nach Änderungen zuerst `validate` ausführen und den Controller neu starten.
 Ein Image-Neubau ist für reine YAML-Änderungen nicht nötig. `doctor` liest die
 konfigurierten Items; weder `validate` noch `doctor` sendet Gerätebefehle.
 
+## Bestätigungsfrage pro Aktion
+
+In jeder Aktion lassen sich diese Felder ergänzen:
+
+```yaml
+require_confirmation: true
+confirmation_text: "Soll ich die Haustür entriegeln und die Falle ziehen?"
+```
+
+`require_confirmation` ist standardmäßig `false`. Bei `true` muss ein eigener,
+nichtleerer `confirmation_text` angegeben werden. Erst nach der Frage und dem
+Signalton führt „Ja“ oder „Ja bitte“ den Befehl aus. „Nein“/„Abbrechen“ verwirft
+den Auftrag; danach folgt „Abgebrochen. Möchtest du noch etwas?“. „Auflegen“
+beendet das Gespräch. Andere Antworten und Schweigen führen zu einer erneuten
+Ja-/Nein-Nachfrage mit demselben Fragetext; nach `dialog.max_failures` endet das
+Gespräch. Es wird dabei kein Befehl gesendet.
+
+Eine Aktion darf im Gespräch beliebig neu angefordert werden und erhält jedes
+Mal eine neue Bestätigungsfrage, falls eingeschaltet. Ein „Ja“ auf „Möchtest du
+noch etwas?“ bestätigt keinen Auftrag, sondern führt zu „Was möchtest du tun?“.
+Aktuell bleiben die Bestätigungsfragen im lokalen Testaufbau für beide Aktionen
+ausgeschaltet. Zum Aktivieren genügt die YAML-Änderung plus Neustart.
+
 ## Diskrete Statuswerte: offen, geschlossen und Bewegung
 
 Vollständiges Beispiel mit Platzhalter-Items und beispielhafter Gerätecodierung:
@@ -144,5 +167,5 @@ success_text: "OK, die Haustür ist freigegeben."
 „Entriegelt“ alleine bestätigt hier nicht das Ziehen der Falle. Der Zustand
 `unlatched` beschreibt die Schlossfreigabe, nicht den physischen Türkontakt.
 Andere Geräte können andere Codes verwenden. Die Steuerung sendet keine
-automatischen Wiederholungen und führt dieselbe Aktion höchstens einmal pro
-Gespräch aus.
+automatischen Wiederholungen. Derselbe Auftrag darf vom Anrufer mehrfach im
+Gespräch neu gestellt werden; pro bestätigter Anforderung wird einmal gesendet.
