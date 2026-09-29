@@ -1,0 +1,15 @@
+.git
+.venv
+__pycache__
+.pytest_cache
+config.yaml
+config.local.yaml
+secrets
+data
+models
+*.log
+*.sqlite*
+*.wav
+.publish.json
+%USERP~1
+.build

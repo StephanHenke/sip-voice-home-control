@@ -1,0 +1,40 @@
+services:
+  controller:
+    build: .
+    image: sip-voice-home-control:local
+    restart: unless-stopped
+    init: true
+    network_mode: host
+    read_only: true
+    cap_drop: [ALL]
+    security_opt:
+      - no-new-privileges:true
+    mem_limit: 2g
+    cpus: 2
+    tmpfs:
+      - /tmp:size=64m,mode=1777
+    volumes:
+      - ./config.yaml:/config/config.yaml:ro
+      - controller-data:/data
+    secrets:
+      - sip_password
+      - openhab_token
+    healthcheck:
+      test: [CMD, voice-home, health]
+      interval: 15s
+      timeout: 5s
+      start_period: 180s
+      retries: 3
+    logging:
+      options:
+        max-size: 10m
+        max-file: "3"
+
+secrets:
+  sip_password:
+    file: ./secrets/sip_password
+  openhab_token:
+    file: ./secrets/openhab_token
+
+volumes:
+  controller-data:

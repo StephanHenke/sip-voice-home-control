@@ -1,0 +1,86 @@
+region: DE
+data_dir: /data
+
+sip:
+  host: 192.0.2.1
+  username: voice-controller
+  password_file: /run/secrets/sip_password
+  port: 5060
+  local_port: 5062
+  rtp_port: 40000
+  # controller_number: "+49..."   # Eigene externe Nummer, niemals Rückrufziel
+  # public_address: 192.0.2.20 # Nur falls die automatisch gewählte IP falsch ist
+
+# Keine Freigabe ab Werk. Nummern ohne Platzhalter vollständig eintragen.
+callers: []
+#  - number: "+49..."
+#    name: "Anna"
+#    access_mode: callback  # Standard; direct ist ausdrücklich konfigurierbar
+
+dialog:
+  answer_delay_ms: 1000
+  listen_timeout_seconds: 8
+  max_failures: 2
+  max_call_seconds: 120
+
+callback:
+  delay_ms: 3000
+  ring_timeout_seconds: 30
+  cooldown_seconds: 60
+  max_attempts_per_number_per_hour: 5
+
+openhab:
+  base_url: http://openhab:8080
+  token_file: /run/secrets/openhab_token
+
+speech:
+  asr_model: /models/vosk-model-small-de-0.15
+  tts_model: /models/de_DE-thorsten-medium.onnx
+  min_confidence: 0.85
+  end_silence_ms: 700
+
+actions:
+  - id: front_door_open
+    enabled: false
+    aliases: ["Haustür", "Tür"]
+    patterns:
+      - "öffne {target}"
+      - "öffne die {target}"
+      - "{target} öffnen"
+      - "die {target} öffnen"
+      - "schließe {target} auf"
+      - "schließe die {target} auf"
+      - "{target} aufschließen"
+      - "die {target} aufschließen"
+      - "mach {target} auf"
+      - "mach die {target} auf"
+    # Beispiel für eine Integration mit Aktion 3=Falle öffnen, Status 5=unlatched.
+    # An die eigene Installation anpassen und echte Geräterückmeldung prüfen!
+    command_item: FrontDoor_Action
+    command: "3"
+    feedback_item: FrontDoor_State
+    success_values: ["5"]
+    failure_values: ["254"]
+    timeout_seconds: 10
+    success_text: "OK, die Haustür ist freigegeben."
+
+  - id: garage_open
+    enabled: false
+    aliases: ["Garagentor", "Garage"]
+    patterns:
+      - "öffne {target}"
+      - "öffne das {target}"
+      - "öffne die {target}"
+      - "{target} öffnen"
+      - "das {target} öffnen"
+      - "die {target} öffnen"
+      - "mach {target} auf"
+      - "mach das {target} auf"
+      - "mach die {target} auf"
+    command_item: ""
+    command: ""
+    feedback_item: ""
+    success_values: []
+    failure_values: []
+    timeout_seconds: 10
+    success_text: "OK, das Garagentor öffnet sich."
