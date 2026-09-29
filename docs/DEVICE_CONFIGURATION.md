@@ -29,8 +29,8 @@ Gespräch. Es wird dabei kein Befehl gesendet.
 Eine Aktion darf im Gespräch beliebig neu angefordert werden und erhält jedes
 Mal eine neue Bestätigungsfrage, falls eingeschaltet. Ein „Ja“ auf „Möchtest du
 noch etwas?“ bestätigt keinen Auftrag, sondern führt zu „Was möchtest du tun?“.
-Aktuell bleiben die Bestätigungsfragen im lokalen Testaufbau für beide Aktionen
-ausgeschaltet. Zum Aktivieren genügt die YAML-Änderung plus Neustart.
+Welche Aktionen eine Bestätigungsfrage verwenden, bestimmt ausschließlich die
+lokale YAML. Zum Aktivieren genügt die YAML-Änderung plus Neustart.
 
 ## Diskrete Statuswerte: offen, geschlossen und Bewegung
 
