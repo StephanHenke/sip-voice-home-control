@@ -185,6 +185,7 @@ def test_execution_requires_new_feedback(config, mode, expected):
     def handler(request):
         requests.append(request)
         if request.method == "GET":
+            assert request.headers["Accept"] == "text/plain"
             return httpx.Response(200, text="5" if mode == "same" else "3")
         assert ready[0].started
         if mode == "timeout":
@@ -227,6 +228,7 @@ def test_rollershutter_requires_measured_decreasing_state(config, auto, value, e
 
     def handler(request):
         if request.url.path.endswith('/state'):
+            assert request.headers["Accept"] == "text/plain"
             return httpx.Response(200, text="100")
         if request.method == "GET":
             metadata = {} if auto is None else {"autoupdate": {"value": auto}}

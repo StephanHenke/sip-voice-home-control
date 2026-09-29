@@ -120,7 +120,7 @@ class OpenHAB:
                     auto = item.get("metadata", {}).get("autoupdate", {}).get("value")
                     trusted_feedback = str(auto).lower() == "false"
             watcher.start()
-            baseline = self.client.get(f"/rest/items/{action.feedback_item}/state")
+            baseline = self.client.get(f"/rest/items/{action.feedback_item}/state", headers={"Accept": "text/plain"})
             baseline.raise_for_status()
             if baseline.text.strip() in {"NULL", "UNDEF"}:
                 return "unconfirmed"
