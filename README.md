@@ -10,6 +10,17 @@ Geräterückmeldungen müssen vor dem produktiven Einsatz abgenommen werden.
 Alle Aktionen und Anruferfreigaben sind in der Beispielkonfiguration deaktiviert.
 Bereits durchgeführte Prüfungen stehen in [VALIDATION.md](docs/VALIDATION.md).
 
+## Dokumentation
+
+- [Alle Konfigurationsparameter](docs/CONFIGURATION.md): Pflichtfelder,
+  Standardwerte, Wertebereiche, Abhängigkeiten, Kommandozeile und Docker-Einstellungen.
+- [Protokolle und gespeicherte Daten](docs/LOGGING_AND_DATA.md): Log-Inhalte,
+  Rufnummernspeicherung, Ansagen-Cache, Aufbewahrung, Diagnose und Log-Befehle.
+- [Geräte konfigurieren](docs/DEVICE_CONFIGURATION.md): Items, Statuszuordnung,
+  Invertierung, Bestätigungsfragen sowie Garage öffnen und schließen.
+- [Gesprächsdiagramm mit allen Ansagen](docs/CALL_FLOW.md).
+- [Teststand](docs/VALIDATION.md) und [Abnahmecheckliste](docs/ACCEPTANCE.md).
+
 ## Funktionen
 
 - Registrierung als SIP-Telefon an der FRITZ!Box, Audio über G.722/G.711.
