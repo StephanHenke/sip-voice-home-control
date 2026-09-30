@@ -1,9 +1,13 @@
-name: Tests and container
+name: Test, build and publish container
 on:
   push:
   pull_request:
+  workflow_dispatch:
 permissions:
   contents: read
+concurrency:
+  group: container-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
 jobs:
   tests:
     runs-on: ubuntu-24.04
@@ -16,18 +20,94 @@ jobs:
       - run: pytest -q
       - run: voice-home --config config.example.yaml validate
   container:
+    needs: tests
     runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    permissions:
+      contents: read
+      packages: write
     steps:
       - uses: actions/checkout@v4
       - uses: docker/setup-buildx-action@v3
       - uses: docker/build-push-action@v6
         with:
           context: .
+          platforms: linux/amd64
           load: true
           tags: sip-voice-home-control:ci
+          labels: |
+            org.opencontainers.image.source=https://github.com/${{ github.repository }}
+            org.opencontainers.image.revision=${{ github.sha }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
       - name: Verify native audio and offline speech
         run: docker run --rm --network none --read-only --tmpfs /tmp:size=128m --cpus 2 --memory 2g --entrypoint python sip-voice-home-control:ci /app/scripts/smoke_runtime.py
       - name: Verify commands, refusals and noise with native speech recognition
         run: docker run --rm --network none --read-only --tmpfs /tmp:size=128m --cpus 2 --memory 2g --entrypoint python sip-voice-home-control:ci /app/scripts/verify_speech.py
+      - name: Select publication targets
+        id: targets
+        if: github.event_name != 'pull_request' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))
+        env:
+          REPOSITORY: ${{ github.repository }}
+          HUB_ENABLED: ${{ vars.DOCKERHUB_ENABLED }}
+          HUB_IMAGE: ${{ vars.DOCKERHUB_IMAGE }}
+          HUB_USERNAME: ${{ vars.DOCKERHUB_USERNAME }}
+          HUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+        run: |
+          python - <<'PY'
+          import os, re
+          from pathlib import Path
+          images = ['ghcr.io/' + os.environ['REPOSITORY'].lower()]
+          hub = os.environ['HUB_ENABLED'] == 'true'
+          if hub:
+              name = os.environ['HUB_IMAGE']
+              if not re.fullmatch(r'[a-z0-9][a-z0-9_-]*/[a-z0-9][a-z0-9_.-]*', name):
+                  raise SystemExit('Set DOCKERHUB_IMAGE to namespace/image (lowercase).')
+              if not os.environ['HUB_USERNAME'] or not os.environ['HUB_TOKEN']:
+                  raise SystemExit('DOCKERHUB_USERNAME and secret DOCKERHUB_TOKEN are required.')
+              images.append('docker.io/' + name)
+          with Path(os.environ['GITHUB_OUTPUT']).open('a') as output:
+              output.write('images<<IMAGES\n' + '\n'.join(images) + '\nIMAGES\n')
+              output.write('publish=true\n')
+              output.write('hub=' + str(hub).lower() + '\n')
+          if not hub:
+              with Path(os.environ['GITHUB_STEP_SUMMARY']).open('a') as summary:
+                  summary.write('Docker Hub is disabled; publishing to GHCR only. See docs/REGISTRY.md.\n')
+          PY
+      - name: Generate image tags
+        id: meta
+        if: steps.targets.outputs.publish == 'true'
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ steps.targets.outputs.images }}
+          flavor: latest=false
+          tags: |
+            type=sha,format=long
+            type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' }}
+            type=semver,pattern={{version}}
+      - name: Log in to GitHub Container Registry
+        if: steps.targets.outputs.publish == 'true'
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Log in to Docker Hub
+        if: steps.targets.outputs.hub == 'true'
+        uses: docker/login-action@v3
+        with:
+          username: ${{ vars.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+      - name: Push the tested image (no rebuild)
+        if: steps.targets.outputs.publish == 'true'
+        env:
+          IMAGE_TAGS: ${{ steps.meta.outputs.tags }}
+        run: |
+          set -euo pipefail
+          while IFS= read -r tag; do
+            [ -n "$tag" ] || continue
+            docker tag sip-voice-home-control:ci "$tag"
+            docker push "$tag"
+            # shellcheck disable=SC2016
+            printf -- '- `%s`\n' "$tag" >> "$GITHUB_STEP_SUMMARY"
+          done <<< "$IMAGE_TAGS"

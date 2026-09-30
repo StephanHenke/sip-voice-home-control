@@ -12,6 +12,9 @@ Bereits durchgeführte Prüfungen stehen in [VALIDATION.md](docs/VALIDATION.md).
 
 ## Dokumentation
 
+- [Automatische Images in GHCR und Docker Hub](docs/REGISTRY.md): Build, Tests,
+  Veröffentlichung, Registry-Zugang und Installation ohne lokalen Build.
+
 - [Alle Konfigurationsparameter](docs/CONFIGURATION.md): Pflichtfelder,
   Standardwerte, Wertebereiche, Abhängigkeiten, Kommandozeile und Docker-Einstellungen.
 - [Protokolle und gespeicherte Daten](docs/LOGGING_AND_DATA.md): Log-Inhalte,
