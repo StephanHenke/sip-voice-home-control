@@ -16,9 +16,6 @@ services:
     volumes:
       - ./config.yaml:/config/config.yaml:ro
       - controller-data:/data
-    secrets:
-      - sip_password
-      - openhab_token
     healthcheck:
       test: [CMD, voice-home, health]
       interval: 15s
@@ -26,15 +23,10 @@ services:
       start_period: 180s
       retries: 3
     logging:
+      driver: json-file
       options:
         max-size: 10m
         max-file: "3"
-
-secrets:
-  sip_password:
-    file: ./secrets/sip_password
-  openhab_token:
-    file: ./secrets/openhab_token
 
 volumes:
   controller-data:

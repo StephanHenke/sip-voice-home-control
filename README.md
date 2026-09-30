@@ -21,12 +21,14 @@ Bereits durchgeführte Prüfungen stehen in [VALIDATION.md](docs/VALIDATION.md).
 - [Gesprächsdiagramm mit allen Ansagen](docs/CALL_FLOW.md).
 - [Teststand](docs/VALIDATION.md) und [Abnahmecheckliste](docs/ACCEPTANCE.md).
 
+- [Betrieb, Anrufsteuerung, RAM-Status und Adapter](docs/OPERATIONS.md).
+
 ## Funktionen
 
 - Registrierung als SIP-Telefon an der FRITZ!Box, Audio über G.722/G.711.
 - Rufnummer und Begrüßungsname werden gemeinsam konfiguriert.
 - Pro Rufnummer Rückrufschutz (`callback`, Standard) oder direkte Annahme (`direct`).
-- Rückruf ausschließlich an die hinterlegte Nummer; dauerhafte Begrenzung der Versuche.
+- Rückruf ausschließlich an die hinterlegte Nummer; konfigurierbare Begrenzung der Versuche im RAM (0 = unbegrenzt).
 - Einstellbare Pause nach Gesprächsannahme, standardmäßig eine Sekunde.
 - „Öffne die Haustür“, „Tür öffnen“, „schließe die Tür auf“, „Tür aufschließen“
   und weitere konfigurierte Satzmuster führen zur gleichen Aktion.
@@ -46,13 +48,8 @@ Als Ausgangspunkt zwei CPU-Kerne und 2 GB RAM einplanen; reale Last und Latenz m
 git clone https://github.com/OWNER/sip-voice-home-control.git
 cd sip-voice-home-control
 cp config.example.yaml config.yaml
-mkdir -m 700 secrets
-install -m 600 /dev/null secrets/sip_password
-install -m 600 /dev/null secrets/openhab_token
-# Secret-Dateien mit einem Editor befüllen; Passwörter nicht in Befehlszeilen schreiben.
-# config.yaml bearbeiten: SIP, openHAB und freigegebene Anrufer eintragen.
-# Der Container läuft mit UID 10001; Secret-Dateien müssen für diese UID lesbar sein.
-sudo chown 10001:10001 secrets/sip_password secrets/openhab_token
+# config.yaml bearbeiten: SIP-Passwort direkt oder Secret-Dateivariante verwenden.
+# openHAB, freigegebene Anrufer und Aktionen konfigurieren.
 docker compose build
 docker compose run --rm controller validate
 docker compose run --rm controller doctor
@@ -302,3 +299,16 @@ Prozess neu; ein bloßer Status `unhealthy` löst durch Compose keinen Neustart 
 
 Siehe [THIRD_PARTY.md](THIRD_PARTY.md). Das Repository ist zunächst privat.
 Eine eigene Veröffentlichungslizenz ist noch nicht festgelegt.
+
+
+### Schreibarmer Betrieb
+
+Rueckrufbudgets und Betriebszustand liegen im RAM. `voice-home status` liest den
+fluechtigen Status fuer CLI/Healthcheck. Die optionale openHAB-Anrufsteuerung kann
+neue Anrufe sperren und Gespraechsaktivitaet zurueckmelden; laufende Gespraeche
+bleiben nutzbar. Saemtliche Smart-Home-Zugriffe erfolgen ueber einen Adapter.
+
+`logging.target` waehlt none, console, file oder syslog. Fuer keine zusaetzlichen
+Docker-Logdateien die Compose-Datei `compose.no-container-logs.yaml` ergaenzen.
+Secret-Dateien sind optional ueber `compose.secrets.yaml` einbindbar.
+Details und Upgrade-Anleitung: [Betrieb](docs/OPERATIONS.md).

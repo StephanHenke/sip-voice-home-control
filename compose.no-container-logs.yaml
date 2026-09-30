@@ -1,0 +1,6 @@
+# Requires Docker Compose >= 2.24.4 for !override.
+# YAML logging.target must separately be none/file/syslog as desired.
+services:
+  controller:
+    logging: !override
+      driver: none

@@ -10,14 +10,18 @@ Ergebnistext und „Möchtest du noch etwas?“ werden zusammenhängend gesproch
 flowchart TD
     Start([Anruf]) --> Allowed{Quelle und Nummer erlaubt?}
     Allowed -- Nein --> Silent([Beenden ohne Ansage])
-    Allowed -- Ja --> Free{Gesprächsplatz frei?}
+    Allowed -- Ja --> Enabled{Annahme freigegeben?}
+    Enabled -- Nein --> Silent
+    Enabled -- Ja --> Free{Gesprächsplatz frei?}
     Free -- Nein --> Silent
     Free -- Ja --> Mode{Zugangsmodus}
     Mode -- direct --> Answer[Annehmen]
     Mode -- callback --> Limit{Rückruflimit eingehalten?}
     Limit -- Nein --> Silent
     Limit -- Ja --> Trigger[Abweisen oder kurz annehmen und auflegen<br/>ohne Ansage]
-    Trigger --> Callback[Rückrufpause, dann gespeicherte Nummer wählen]
+    Trigger --> Gate{Weiterhin freigegeben?}
+    Gate -- Nein --> Silent
+    Gate -- Ja --> Callback[Rückrufpause, dann gespeicherte Nummer wählen]
     Callback --> Connected{Rückruf angenommen?}
     Connected -- Nein / Fehler / Zeitlimit --> Silent
     Connected -- Ja --> Media
@@ -105,3 +109,11 @@ Die Nachfrage nennt aktuell fest „Haustür öffnen“, auch wenn nur andere Ak
 aktiviert sind. Namen, Bestätigungsfragen und Erfolgsansagen sind variabel; die
 übrigen hier gezeigten Ansagetexte stehen derzeit in `src/voice_home/dialog.py`.
 Zusätzliche YAML-Aktionen bringen ihre eigene Erfolgsansage mit.
+
+
+## Steuerung waehrend des Betriebs
+
+AUS sperrt neue Anrufe und verwirft wartende Rueckrufe. Bestehende Gespraeche
+bleiben mit allen Befehlen nutzbar. Ein bereits gestarteter ausgehender Rueckruf
+laeuft weiter. EIN reaktiviert keine verworfenen Rueckrufe. Limits mit Wert 0
+sind unabhaengig deaktiviert. Keine neue TTS-Ansage durch Statussteuerung.

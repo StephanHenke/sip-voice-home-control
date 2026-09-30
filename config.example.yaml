@@ -4,7 +4,8 @@ data_dir: /data
 sip:
   host: 192.0.2.1
   username: voice-controller
-  password_file: /run/secrets/sip_password
+  password: "CHANGE_ME"
+  # Alternative (remove password above): password_file: /run/secrets/sip_password
   port: 5060
   local_port: 5062
   transport: udp  # Alternativ tcp, z. B. bei Docker Desktop/NAT
@@ -34,7 +35,8 @@ callback:
 
 openhab:
   base_url: http://openhab:8080
-  token_file: /run/secrets/openhab_token
+  token: ""
+  # Alternative: token_file: /run/secrets/openhab_token
 
 speech:
   command_vocabulary: true
@@ -134,3 +136,28 @@ actions:
     success_text: "OK, das Garagentor ist geschlossen."
     require_confirmation: false
     confirmation_text: "Soll ich das Garagentor schließen?"
+
+# Optional controller control/status integration (item names are configurable).
+smarthome:
+  adapter: openhab
+call_control:
+  enabled: false
+  initial_accepting: true
+  switch_item: VoiceController_AcceptCalls
+  status_item: VoiceController_Status
+  call_active_item: VoiceController_CallActive
+  heartbeat_item: VoiceController_Heartbeat
+  heartbeat_interval_seconds: 10
+logging:
+  level: INFO  # OFF, ERROR, WARNING, INFO, DEBUG
+  target: console  # none, console, file, syslog
+  # file: absolute path; /tmp/voice-home/controller.log stays in RAM
+  # path: /tmp/voice-home/controller.log
+  # max_bytes: 10485760
+  # backup_count: 2
+  # syslog:
+  # host: syslog.example.lan
+  # port: 514
+  # transport: udp  # udp or tcp
+  # facility: local0
+  # queue_size: 1000

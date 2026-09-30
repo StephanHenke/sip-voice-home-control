@@ -12,12 +12,12 @@ Ein Image-Neubau ist für reine Konfigurationsänderungen nicht erforderlich.
 ## Aufbau und allgemeine Werte
 
 Die obersten Bereiche sind `sip`, `callers`, `dialog`, `callback`, `openhab`,
-`speech` und `actions`; hinzu kommen `region` und `data_dir`.
+`speech`, `actions`, `smarthome`, `call_control` und `logging`; hinzu kommen `region` und `data_dir`.
 
 | Parameter | Standard | Bedeutung |
 | --- | --- | --- |
 | `region` | `DE` | Region zur Interpretation national geschriebener Rufnummern. Nummern mit Landesvorwahl sind vorzuziehen. |
-| `data_dir` | `/data` | Beschreibbares Verzeichnis für Rückrufdatenbank, erzeugte Ansagen und Healthstatus. Details: [Daten und Protokolle](LOGGING_AND_DATA.md). |
+| `data_dir` | `/data` | Beschreibbares Verzeichnis fuer erzeugte Ansagen. Laufzeitstatus und Rueckruflimits liegen im RAM. |
 | `callers` | `[]` | Liste erlaubter Anrufer. Ohne Einträge wird kein Anrufer zugelassen. |
 | `actions` | `[]` | Liste konfigurierter Aktionen. Ohne Einträge gibt es keine ausführbare Geräteaktion. |
 
@@ -32,7 +32,7 @@ Es gibt keine allgemeinen Umgebungsvariablen zum Überschreiben der YAML-Werte.
 | --- | --- | --- |
 | `sip.host` | Pflicht | IPv4-Adresse der FRITZ!Box. Registrar und erlaubte Netzwerkquelle eingehender Anrufe. |
 | `sip.username` | Pflicht | SIP-Benutzername; Buchstaben, Ziffern, `_`, `.`, `-`. |
-| `sip.password_file` | Pflicht | Pfad zur Datei mit dem SIP-Passwort, z. B. `/run/secrets/sip_password`. Inhalt muss beim SIP-Start vorhanden und nicht leer sein. |
+| `sip.password_file` | Alternative zu `sip.password` | Pfad zur Datei mit dem SIP-Passwort, z. B. `/run/secrets/sip_password`. Inhalt muss beim SIP-Start vorhanden und nicht leer sein. |
 | `sip.port` | `5060` | SIP-Port der FRITZ!Box. |
 | `sip.local_port` | `5062` | Lokaler SIP-Port des Controllers. |
 | `sip.transport` | `udp` | `udp` oder `tcp`; betrifft SIP-Signalisierung, nicht den RTP-Audiotransport. |
@@ -82,14 +82,14 @@ Antwortfenster. Lautstärkeaktivität allein ist noch kein verstandener Befehl.
 | `callback.trigger_mode` | `reject` | `reject`: ursprünglichen Anruf mit SIP 603 abweisen. `answer_hangup`: kurz annehmen, bestätigten Verbindungsaufbau abwarten, sofort auflegen, anschließend zurückrufen. |
 | `callback.delay_ms` | `3000` | Pause nach Beendigung des ursprünglichen Anrufs bis zum Rückruf; `0` ist erlaubt. |
 | `callback.ring_timeout_seconds` | `30` | Höchstdauer bis zum bestätigten Verbindungsaufbau. Begrenzt insbesondere das Klingeln beim Rückruf; der Adapter verwendet sie allgemein für noch nicht bestätigte Anrufe. |
-| `callback.cooldown_seconds` | `60` | Mindestabstand zwischen zugelassenen Rückrufversuchen derselben Nummer. |
-| `callback.max_attempts_per_number_per_hour` | `5` | Höchstzahl zugelassener Rückrufversuche pro Nummer in den letzten 3600 Sekunden, keine feste Uhrzeit-Stunde. Ganze Zahl größer `0`. |
+| `callback.cooldown_seconds` | `60` | Mindestabstand zwischen Rueckrufversuchen derselben Nummer. `0` deaktiviert nur diesen Mindestabstand. |
+| `callback.max_attempts_per_number_per_hour` | `5` | Hoechstzahl pro Nummer in den letzten 3600 Sekunden; ganze Zahl >= 0. `0` deaktiviert nur dieses Limit. Budgets liegen ausschliesslich im RAM. |
 
 Zeitwerte müssen endlich und positiv sein; nur `delay_ms` darf `0` sein.
 Fehlgeschlagene Rückrufe zählen als Versuch. Es gibt keine automatische
 Wahlwiederholung, keinen Ersatz durch Direktannahme und keine Warteschlange.
 Ein Gespräch oder ausstehender Rückruf belegt den einzigen Gesprächsplatz.
-Die Limits bleiben durch SQLite über Neustarts erhalten. Direkte Anrufe verwenden
+Die Limits liegen nur im RAM und beginnen nach jedem Neustart neu. Direkte Anrufe verwenden
 diese Rückruflimits nicht. `answer_hangup` kann tarifabhängig als angenommener
 Anruf berechnet werden.
 
@@ -98,7 +98,7 @@ Anruf berechnet werden.
 | Parameter | Standard | Bedeutung |
 | --- | --- | --- |
 | `openhab.base_url` | `http://openhab:8080` | Basis-URL mit `http` oder `https` und Hostname/IP. Keine Zugangsdaten, Abfrageparameter oder URL-Fragmente in die URL schreiben. |
-| `openhab.token_file` | `""` | Datei mit API-Token. Bei leerem Wert wird ohne Bearer-Token gearbeitet; das muss openHAB erlauben. Die Beispiel-YAML setzt `/run/secrets/openhab_token`. |
+| `openhab.token_file` | `""` | Datei mit API-Token. Bei leerem Wert wird ohne Bearer-Token gearbeitet; das muss openHAB erlauben. Alternativ `openhab.token` direkt setzen. Die Beispiel-YAML verwendet einen leeren Token. |
 
 Der Controller liest Item-Zustände und Ereignisse und sendet einzelne REST-Befehle.
 Ein HTTP-Erfolg allein ist keine Bestätigung der Gerätebewegung. Der Befehl wird
@@ -205,7 +205,7 @@ Anwendungs-YAML. Service-Name: `controller`.
 | `mem_limit`, `cpus` | `2g`, `2`. |
 | `tmpfs` | `/tmp:size=64m,mode=1777`; flüchtiges temporäres Dateisystem. |
 | `volumes` | `./config.yaml` schreibgeschützt nach `/config/config.yaml`; benanntes Volume `controller-data` nach `/data`. Bei Änderung von `data_dir` die Einbindung anpassen. |
-| `secrets` | Dateien `./secrets/sip_password` und `./secrets/openhab_token` nach `/run/secrets/…`. Dateien müssen für Container-UID `10001` lesbar sein. |
+| `secrets` | Optional ueber `compose.secrets.yaml`: Dateien nach `/run/secrets/`. Fuer UID 10001 lesbar; bei direkter YAML-Konfiguration nicht erforderlich. |
 | `healthcheck.test` | `[CMD, voice-home, health]`. |
 | `healthcheck.interval`, `timeout`, `start_period`, `retries` | `15s`, `5s`, `180s`, `3`. |
 | `logging.options.max-size`, `logging.options.max-file` | `10m`, `"3"`; vom Docker-Logging-Treiber umgesetzte Dateirotation. Kein Löschalter in Tagen. Details: [Protokolle](LOGGING_AND_DATA.md). |
@@ -221,3 +221,21 @@ Codec-Reihenfolge G.722 → PCMA → PCMU, 16-kHz-Mono-Verarbeitung,
 Lautstärkeschwelle 250, 250-ms-Pause vor dem Signalton und dessen 80-ms-Dauer.
 Es gibt keine YAML-Parameter für Log-Level, Gesprächsaufzeichnung oder
 automatisches Löschen alter TTS-Ansagen.
+
+
+## Neue Betriebsparameter und Zugangsdaten
+
+Die vollstaendige Referenz fuer `smarthome.*`, `call_control.*`, RAM-Status und
+`voice-home status` steht unter [Betrieb](OPERATIONS.md). Alle `logging.*`-Parameter
+mit Defaults und Zielsemantik stehen unter [Protokolle und Daten](LOGGING_AND_DATA.md).
+
+`sip.password` (String) ist die direkte Alternative zu `sip.password_file`;
+`openhab.token` (String, Standard leer) die Alternative zu `openhab.token_file`.
+Jeweils zwei nichtleere Quellen ergeben einen Fehler. Relative Dateipfade werden
+relativ zur YAML-Datei aufgeloest. `validate` prueft die Quellenauswahl ohne Secrets
+zu lesen; `serve`, `register` und `doctor` lesen benoetigte Werte. Secrets werden
+nie in Ausgaben aufgenommen.
+
+Die Statusdatei liegt fest unter `/tmp/voice-home/health.json`, unabhaengig von
+`data_dir`. `data_dir` bleibt fuer den Ansagencache. Alle neuen Steuerungs- und
+Logeinstellungen werden beim Prozessstart geladen; Aenderungen brauchen einen Neustart.

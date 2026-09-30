@@ -30,9 +30,11 @@ def setup(monkeypatch, tmp_path):
     engine.config = cfg
     engine.dialog = Dialog(cfg)
     engine.probe = False
+    engine.accepting = True
+    engine.bridge = None
     engine.current = engine.pending = engine.task = None
     engine.calls = {}
-    engine.limits = CallbackLimits(tmp_path / "budget.sqlite", 60, 5)
+    engine.limits = CallbackLimits(60, 5)
     captured = []
 
     class FakeCall:
@@ -81,6 +83,47 @@ def test_callback_rejects_before_scheduling_and_never_connects_inbound(setup):
     assert e.pending[1] is e.config.callers[0]
     assert e.pending[1].number == "+4915123456789"
     assert e.busy
+
+
+@pytest.mark.parametrize('mode', ['callback', 'direct'])
+def test_disabled_rejects_without_budget_or_answer(setup, mode):
+    _, _, e, account, p, calls = setup
+    e.accepting = False
+    e.config = replace(e.config, callers=[replace(e.config.callers[0], access_mode=mode)])
+    account.onIncomingCall(p)
+    assert calls[0].code == 486
+    assert not hasattr(calls[0], 'answered_with')
+    assert not e.limits.attempts
+    assert e.current is None
+
+
+def test_off_on_during_trigger_does_not_resurrect_callback(setup):
+    _, pj, e, account, p, calls = setup
+    account.onIncomingCall(p)
+    e.bridge = types.SimpleNamespace(commands=queue.Queue())
+    e.health = lambda: None
+    e.bridge.commands.put(False)
+    e.bridge.commands.put(True)
+    e.drain_control()
+    e.process_event('state', calls[0], pj.PJSIP_INV_STATE_DISCONNECTED)
+    assert e.pending is None
+    assert e.accepting
+    assert e.limits.attempts
+
+
+def test_off_cancels_pending_but_preserves_connected_call(setup):
+    _, _, e, _, _, _ = setup
+    e.current = types.SimpleNamespace(callback_trigger=False, cancelled=threading.Event())
+    original = e.current
+    e.pending = (time.monotonic() + 3, e.config.callers[0])
+    e.health = lambda: None
+    e.bridge = types.SimpleNamespace(commands=queue.Queue())
+    e.bridge.commands.put(False)
+    e.drain_control()
+    assert e.current is original
+    assert not original.cancelled.is_set()
+    assert e.pending is None
+    assert not e.accepting
 
 
 def test_parallel_request_gets_busy_without_new_budget(setup):
@@ -158,7 +201,7 @@ def test_question_playback_and_beep_preserve_confirmation_until_explicit_yes(set
     preparation = []
     e.speech = types.SimpleNamespace(path=lambda text: text, beep="beep", reset=lambda: preparation.append("reset"))
     submitted = []
-    e.openhab = types.SimpleNamespace(execute=lambda *_: None)
+    e.executor = types.SimpleNamespace(execute=lambda *_: None)
     e.pool = types.SimpleNamespace(submit=lambda *args: submitted.append(args))
     call = types.SimpleNamespace(
         session=e.dialog.connected(e.config.callers[0]), cancelled=threading.Event(),

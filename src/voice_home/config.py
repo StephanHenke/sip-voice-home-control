@@ -10,6 +10,8 @@ import re
 import phonenumbers
 import yaml
 
+from .settings import credential_source, operational_settings
+
 
 def number(value: str, region: str = "DE") -> str:
     if not isinstance(value, str):
@@ -31,6 +33,10 @@ def secret(path: str) -> str:
     if not result:
         raise ValueError("Leere Secret-Datei")
     return result
+
+
+def credential(settings: dict, name: str) -> str:
+    return settings.get(name) or (secret(settings[name + '_file']) if settings.get(name + '_file') else '')
 
 
 @dataclass(frozen=True)
@@ -123,22 +129,25 @@ def validate_feedback(action: Action):
 
 @dataclass(frozen=True)
 class Config:
-    sip: dict
+    sip: dict = field(repr=False)
     callers: list[Caller]
     actions: list[Action]
     dialog: dict
     callback: dict
-    openhab: dict
+    openhab: dict = field(repr=False)
     speech: dict
     data_dir: Path
     region: str = "DE"
+    call_control: dict = field(default_factory=dict)
+    smarthome: dict = field(default_factory=dict)
+    logging: dict = field(default_factory=dict)
 
 
 def load(path: str | Path) -> Config:
     raw = yaml.safe_load(Path(path).read_text(encoding="utf-8"))
     if not isinstance(raw, dict):
         raise ValueError("Konfiguration muss ein YAML-Objekt sein")
-    unknown = set(raw) - {"sip", "callers", "actions", "dialog", "callback", "openhab", "speech", "data_dir", "region"}
+    unknown = set(raw) - {"sip", "callers", "actions", "dialog", "callback", "openhab", "speech", "data_dir", "region", "call_control", "smarthome", "logging"}
     if unknown:
         raise ValueError(f"Unbekannte Konfigurationsbereiche: {sorted(unknown)}")
     region = raw.get("region", "DE")
@@ -151,8 +160,7 @@ def load(path: str | Path) -> Config:
             raise ValueError(f"Ungültiger SIP-Port: {key}")
     if not re.fullmatch(r"[A-Za-z0-9_.-]+", sip["username"]):
         raise ValueError("Ungültiger SIP-Benutzername")
-    if not sip.get("password_file"):
-        raise ValueError("sip.password_file fehlt")
+    credential_source(sip, "password", Path(path).resolve().parent, required=True)
     if sip.get("public_address"):
         ipaddress.IPv4Address(sip["public_address"])
     callers = [Caller(number(c["number"], region), str(c["name"]).strip(), c.get("access_mode", "callback")) for c in raw.get("callers", [])]
@@ -201,7 +209,7 @@ def load(path: str | Path) -> Config:
         for key, value in settings.items():
             if key == "trigger_mode":
                 continue
-            if type(value) not in (int, float) or not math.isfinite(value) or value < 0 or (key not in {"answer_delay_ms", "delay_ms"} and value == 0):
+            if type(value) not in (int, float) or not math.isfinite(value) or value < 0 or (key not in {"answer_delay_ms", "delay_ms", "cooldown_seconds", "max_attempts_per_number_per_hour"} and value == 0):
                 raise ValueError(f"Ungültige Zeit/Grenze: {key}")
     if type(callback["max_attempts_per_number_per_hour"]) is not int or type(dialog["max_failures"]) is not int:
         raise ValueError("Zählergrenzen müssen ganze Zahlen sein")
@@ -211,4 +219,6 @@ def load(path: str | Path) -> Config:
     parsed_url = urlparse(openhab["base_url"])
     if parsed_url.scheme not in {"http", "https"} or not parsed_url.hostname or parsed_url.username or parsed_url.query or parsed_url.fragment:
         raise ValueError("Ungültige openHAB-URL")
-    return Config(sip, callers, actions, dialog, callback, openhab, speech, Path(raw.get("data_dir", "/data")), region)
+    credential_source(openhab, "token", Path(path).resolve().parent)
+    control, smart, logs = operational_settings(raw)
+    return Config(sip, callers, actions, dialog, callback, openhab, speech, Path(raw.get("data_dir", "/data")), region, control, smart, logs)

@@ -1,0 +1,4 @@
+Switch VoiceController_AcceptCalls "Anrufannahme" { autoupdate="false" }
+String VoiceController_Status "Sprachcontroller [%s]"
+Switch VoiceController_CallActive "Gespräch aktiv" { autoupdate="false" }
+DateTime VoiceController_Heartbeat "Letztes Lebenszeichen [%1$tH:%1$tM:%1$tS]" { expire="30s,state=UNDEF" }

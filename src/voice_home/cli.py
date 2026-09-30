@@ -1,12 +1,13 @@
 import argparse
 import json
-import logging
-import time
 
 import httpx
 import yaml
 
-from .config import load
+from .config import load, credential
+from .runtime import read_status
+from .settings import SettingsError
+from .logging_config import configure, suppress_native_output
 from .dialog import Dialog
 
 
@@ -19,28 +20,40 @@ def main():
     sub.add_parser("serve", help="SIP und Sprachdialog starten")
     probe = sub.add_parser("register", help="Nur SIP-Anmeldung testen; alle Anrufe ablehnen")
     probe.add_argument("--seconds", type=float, default=15)
+    sub.add_parser("status", help="Aktuellen Betriebszustand als JSON ausgeben")
     sub.add_parser("health", help="Aktuellen lokalen Healthcheck auswerten")
     parse = sub.add_parser("parse", help="Sprachtext offline zuordnen")
     parse.add_argument("text")
     args = parser.parse_args()
-    logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
     try:
         config = load(args.config)
+        if args.command in {'serve', 'register'}:
+            suppress_native_output()
+        if args.command in {'serve', 'register', 'doctor'}:
+            values = []
+            if args.command != 'doctor':
+                values.append(credential(config.sip, 'password'))
+            if args.command != 'register':
+                values.append(credential(config.openhab, 'token'))
+            configure(config.logging, values)
         dialog = Dialog(config)
         if args.command == "validate":
             print(json.dumps({"valid": True, "callers": len(config.callers), "actions": len(config.actions), "phrases": len(dialog.intents.phrases)}))
         elif args.command == "parse":
             print(json.dumps(dialog.intents.parse(args.text), ensure_ascii=False))
         elif args.command == "doctor":
-            from .openhab import OpenHAB
-            client = OpenHAB(config.openhab)
+            from .smarthome import create_adapter
+            client = create_adapter(config)
             try:
-                print(json.dumps(client.check(config.actions)))
+                print(json.dumps(client.check(config.actions, config.call_control)))
             finally:
                 client.close()
-        elif args.command == "health":
-            status = json.loads((config.data_dir / "health.json").read_text())
-            raise SystemExit(0 if time.time() - status["at"] < 15 and status["registered"] and status["speech_ready"] else 1)
+        elif args.command in {'health', 'status'}:
+            status = read_status()
+            if args.command == 'status':
+                print(json.dumps(status))
+                raise SystemExit(0 if status['fresh'] else 1)
+            raise SystemExit(0 if status['fresh'] and status.get('registered') and status.get('speech_ready') else 1)
         else:
             from .sip import Engine
             engine = Engine(config, probe=args.command == "register")
@@ -48,9 +61,11 @@ def main():
             if args.command == "register":
                 print(json.dumps({"registration_success": ok}))
                 raise SystemExit(0 if ok else 1)
-    except (ValueError, KeyError, TypeError, OSError, yaml.YAMLError, httpx.HTTPError) as exc:
+    except (ValueError, KeyError, TypeError, OSError, RuntimeError, yaml.YAMLError, httpx.HTTPError) as exc:
         # Do not dump entire configurations or secret values in exception output.
-        logging.error("Konfiguration/Datei nicht verwendbar (%s)", type(exc).__name__)
+        import sys
+        detail = str(exc) if isinstance(exc, SettingsError) else type(exc).__name__
+        print(f"Konfiguration/Datei nicht verwendbar ({detail})", file=sys.stderr)
         raise SystemExit(2)
 
 

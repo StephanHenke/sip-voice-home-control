@@ -2,14 +2,14 @@
 
 from dataclasses import dataclass
 import json
-import math
 import queue
 import threading
 import time
 
 import httpx
 
-from .config import Action, secret
+from .config import Action, credential
+from .actions import ActionExecutor, CommandRejected
 
 
 @dataclass(frozen=True)
@@ -33,8 +33,22 @@ def decode_event(data: str, item: str) -> str | None:
         return None
 
 
+def decode_command(data, item):
+    try:
+        event = json.loads(data)
+        if event.get('type') != 'ItemCommandEvent' or event.get('topic') != f'openhab/items/{item}/command':
+            return None
+        payload = event['payload']
+        payload = json.loads(payload) if isinstance(payload, str) else payload
+        value = payload['value']
+        return value if value in ('ON', 'OFF') else None
+    except (ValueError, TypeError, KeyError):
+        return None
+
+
 class EventWatch:
-    def __init__(self, client: httpx.Client, item: str):
+    def __init__(self, client: httpx.Client, item: str, commands=False):
+        self.commands = commands
         self.client, self.item = client, item
         self.ready = threading.Event()
         self.failed = threading.Event()
@@ -45,7 +59,7 @@ class EventWatch:
 
     def _read(self):
         try:
-            with self.client.stream("GET", "/rest/events", params={"topics": f"openhab/items/{self.item}/*"}, headers={"Accept": "text/event-stream"}, timeout=httpx.Timeout(4, read=None)) as response:
+            with self.client.stream("GET", "/rest/events", params={"topics": f"openhab/items/{self.item}/*"}, headers={"Accept": "text/event-stream"}, timeout=httpx.Timeout(4, read=35 if self.commands else None)) as response:
                 self.response = response
                 response.raise_for_status()
                 if "text/event-stream" not in response.headers.get("content-type", ""):
@@ -58,7 +72,7 @@ class EventWatch:
                     if line.startswith("data:"):
                         data.append(line[5:].lstrip())
                     elif not line and data:
-                        value = decode_event("\n".join(data), self.item)
+                        value = (decode_command if self.commands else decode_event)("\n".join(data), self.item)
                         data = []
                         if value is not None:
                             self.events.put_nowait(Feedback(time.monotonic(), value))
@@ -86,93 +100,57 @@ class EventWatch:
 class OpenHAB:
     def __init__(self, config: dict, *, client=None, watch_factory=EventWatch):
         headers = {"Accept": "application/json"}
-        if config.get("token_file"):
-            headers["Authorization"] = f"Bearer {secret(config['token_file'])}"
+        token = credential(config, "token")
+        if token:
+            headers["Authorization"] = f"Bearer {token}"
         self.client = client or httpx.Client(base_url=config["base_url"].rstrip("/"), headers=headers, timeout=4, follow_redirects=False, trust_env=False)
         self.watch_factory = watch_factory
 
     def close(self):
         self.client.close()
 
-    def check(self, actions: list[Action]) -> dict:
+    def check(self, actions: list[Action], control=None) -> dict:
         response = self.client.get("/rest/")
         response.raise_for_status()
         for action in actions:
             if action.enabled:
                 for item in (action.command_item, action.feedback_item):
                     self.client.get(f"/rest/items/{item}").raise_for_status()
+        if control and control['enabled']:
+            for key, expected in [('switch_item', 'Switch'), ('status_item', 'String'), ('call_active_item', 'Switch'), ('heartbeat_item', 'DateTime')]:
+                item = self.read_item(control[key])
+                if item.get('type') != expected:
+                    raise ValueError('Control item type mismatch')
         return {"openhab": "reachable", "enabled_actions": sum(a.enabled for a in actions)}
 
-    def execute(self, action: Action, cancelled: threading.Event) -> str:
-        if not action.enabled:
-            return "disabled"
-        watcher = self.watch_factory(self.client, action.feedback_item)
-        sent = False
+    def read_item(self, item):
+        return self._request('GET', f'/rest/items/{item}', params={'metadata': 'autoupdate'}).json()
+
+    def read_state(self, item):
+        return self._request('GET', f'/rest/items/{item}/state', headers={'Accept': 'text/plain'}).text.strip()
+
+    def send_command(self, item, value):
+        self._request('POST', f'/rest/items/{item}', content=value, headers={'Content-Type': 'text/plain'})
+
+    def publish_state(self, item, value):
+        self._request('PUT', f'/rest/items/{item}/state', content=value, headers={'Content-Type': 'text/plain'})
+
+    def _request(self, method, path, **kwargs):
         try:
-            trusted_feedback = True
-            same_item = action.command_item == action.feedback_item
-            if action.feedback_mode == "rollershutter_opening" or same_item:
-                item_response = self.client.get(f"/rest/items/{action.feedback_item}", params={"metadata": "autoupdate"})
-                item_response.raise_for_status()
-                item = item_response.json()
-                if action.feedback_mode == "rollershutter_opening" and item.get("type") != "Rollershutter":
-                    return "failed"
-                if same_item:
-                    auto = item.get("metadata", {}).get("autoupdate", {}).get("value")
-                    trusted_feedback = str(auto).lower() == "false"
-            watcher.start()
-            baseline = self.client.get(f"/rest/items/{action.feedback_item}/state", headers={"Accept": "text/plain"})
-            baseline.raise_for_status()
-            if baseline.text.strip() in {"NULL", "UNDEF"}:
-                return "unconfirmed"
-            initial_percent = None
-            lower, upper = sorted((action.open_position, action.closed_position))
-            if action.feedback_mode == "rollershutter_opening":
-                initial_percent = float(baseline.text.strip())
-                if not math.isfinite(initial_percent) or not lower <= initial_percent <= upper:
-                    return "unconfirmed"
-            if cancelled.is_set() or watcher.failed.is_set():
-                return "unconfirmed"
-            dispatched_at = time.monotonic()
-            sent = True  # timeout may occur after openHAB accepted the command
-            response = self.client.post(f"/rest/items/{action.command_item}", content=action.command, headers={"Content-Type": "text/plain"})
-            if 400 <= response.status_code < 500:
-                return "failed"
+            response = self.client.request(method, path, **kwargs)
+            if method == 'POST' and 400 <= response.status_code < 500:
+                raise CommandRejected('Command rejected')
             response.raise_for_status()
-            if not trusted_feedback:
-                # autoupdate can predict the target position immediately.
-                # The command was sent, but this cannot prove physical movement.
-                return "unconfirmed"
-            deadline = dispatched_at + action.timeout_seconds
-            success_values = action.resolved_success_values
-            failure_values = action.resolved_failure_values
-            while time.monotonic() < deadline and not cancelled.is_set():
-                if watcher.failed.is_set():
-                    return "unconfirmed"
-                try:
-                    event = watcher.events.get(timeout=min(0.1, max(0.001, deadline - time.monotonic())))
-                except queue.Empty:
-                    continue
-                if event.at < dispatched_at:
-                    continue
-                if event.value in failure_values:
-                    return "failed"
-                if initial_percent is not None:
-                    try:
-                        current = float(event.value)
-                    except ValueError:
-                        continue
-                    if math.isfinite(current) and lower <= current <= upper and abs(current - action.open_position) < abs(initial_percent - action.open_position):
-                        return "ok"
-                    continue
-                # Reject a pre-existing success state echoed by polling/autoupdate.
-                changed = event.value != baseline.text.strip()
-                if action.state_values:
-                    changed = action.state_for(event.value) != action.state_for(baseline.text.strip())
-                if event.value in success_values and changed:
-                    return "ok"
-            return "unconfirmed"
-        except (httpx.HTTPError, RuntimeError, ValueError):
-            return "unconfirmed" if sent else "failed"
-        finally:
-            watcher.close()
+            return response
+        except httpx.HTTPError:
+            raise RuntimeError('Adapter request failed') from None
+
+    def watch_state(self, item):
+        return self.watch_factory(self.client, item)
+
+    def watch_commands(self, item):
+        return EventWatch(self.client, item, commands=True)
+
+    def execute(self, action, cancelled):
+        # Compatibility for existing consumers; engine uses the neutral executor.
+        return ActionExecutor(self).execute(action, cancelled)

@@ -92,14 +92,14 @@ def test_sip_transport_config(tmp_path, transport):
         assert load(path).sip["transport"] == transport
 
 
-def test_limits_persist_and_count_failed_attempts(tmp_path):
-    path = tmp_path / "limits.sqlite"
-    assert CallbackLimits(path, 60, 2).reserve("a", 1000)
-    assert not CallbackLimits(path, 60, 2).reserve("a", 1050)
-    assert CallbackLimits(path, 60, 2).reserve("a", 1061)
-    assert not CallbackLimits(path, 60, 2).reserve("a", 1122)
-    assert CallbackLimits(path, 60, 2).reserve("b", 1122)
-    assert CallbackLimits(path, 60, 2).reserve("a", 5000)
+def test_limits_count_failed_attempts():
+    limits = CallbackLimits(60, 2)
+    assert limits.reserve("a", 1000)
+    assert not limits.reserve("a", 1050)
+    assert limits.reserve("a", 1061)
+    assert not limits.reserve("a", 1122)
+    assert limits.reserve("b", 1122)
+    assert limits.reserve("a", 5000)
 
 
 @pytest.mark.parametrize("delay", [0, 1000, 2500])

@@ -2,7 +2,6 @@
 
 import audioop
 from concurrent.futures import ThreadPoolExecutor
-import json
 import logging
 import queue
 import signal
@@ -11,10 +10,12 @@ import time
 
 import pjsua2 as pj
 
-from .config import Config, secret
+from .config import Config, credential
 from .dialog import Dialog
 from .limits import CallbackLimits
-from .openhab import OpenHAB
+from .actions import ActionExecutor
+from .smarthome import create_adapter, ControlBridge
+from .runtime import write_status, operating_status
 from .routing import callback_uri, identify
 from .speech import Speech
 
@@ -163,6 +164,11 @@ class Account(pj.Account):
             log.info("sip_rejected reason=%s", "registration_probe" if self.engine.probe else "untrusted_peer_or_number")
             call.end(403)
             return
+        self.engine.drain_control()
+        if not self.engine.accepting:
+            log.info("sip_rejected reason=disabled")
+            call.end(486)
+            return
         if self.engine.busy:
             log.info("sip_rejected reason=busy")
             call.end(486)
@@ -206,10 +212,18 @@ class Engine:
         self.registered = False
         self.registration_code = 0
         self.stopping = False
+        self.starting = True
+        self.accepting = config.call_control.get("initial_accepting", True)
+        self.bridge = None
+        self.last_snapshot = None
+        self.last_health_at = 0
         self.pool = ThreadPoolExecutor(max_workers=1)
-        self.limits = CallbackLimits(config.data_dir / "callbacks.sqlite", config.callback["cooldown_seconds"], config.callback["max_attempts_per_number_per_hour"])
+        self.limits = CallbackLimits(config.callback["cooldown_seconds"], config.callback["max_attempts_per_number_per_hour"])
+        self.speech = None
+        self.health()
         self.speech = None if probe else Speech(config.speech, config.data_dir / "prompts", self.dialog.prompts(), config.actions)
-        self.openhab = None if probe else OpenHAB(config.openhab)
+        self.adapter = None if probe else create_adapter(config)
+        self.executor = None if probe else ActionExecutor(self.adapter)
         self.endpoint = pj.Endpoint()
         self.endpoint.libCreate()
         cfg = pj.EpConfig()
@@ -217,8 +231,8 @@ class Engine:
         cfg.uaConfig.mainThreadOnly = True
         cfg.uaConfig.maxCalls = 4  # one authorized session plus calls being rejected
         cfg.uaConfig.userAgent = "sip-voice-home-control/0.1"
-        cfg.logConfig.level = 1
-        cfg.logConfig.consoleLevel = 1
+        cfg.logConfig.level = 0
+        cfg.logConfig.consoleLevel = 0
         cfg.logConfig.msgLogging = False
         cfg.medConfig.clockRate = 16000
         cfg.medConfig.sndClockRate = 16000
@@ -247,11 +261,17 @@ class Engine:
         ac.regConfig.firstRetryIntervalSec = 3
         ac.regConfig.timeoutSec = 300
         ac.sipConfig.transportId = tid
-        ac.sipConfig.authCreds.append(pj.AuthCredInfo("digest", "*", config.sip["username"], 0, secret(config.sip["password_file"])))
+        ac.sipConfig.authCreds.append(pj.AuthCredInfo("digest", "*", config.sip["username"], 0, credential(config.sip, "password")))
         ac.mediaConfig.transportConfig.port = config.sip["rtp_port"]
         ac.mediaConfig.transportConfig.portRange = 10
         ac.mediaConfig.transportConfig.publicAddress = config.sip.get("public_address", "")
         self.account.create(ac)
+        if not probe and config.call_control.get('enabled'):
+            self.bridge = ControlBridge(create_adapter(config), config.call_control)
+            self.bridge.update(self.snapshot())
+            self.bridge.start()
+        self.starting = False
+        self.health()
 
     @property
     def busy(self):
@@ -265,7 +285,7 @@ class Engine:
         if kind == "hangup":
             call.end()
         elif kind == "execute":
-            future = self.pool.submit(self.openhab.execute, self.dialog.actions[value], call.cancelled)
+            future = self.pool.submit(self.executor.execute, self.dialog.actions[value], call.cancelled)
             self.task = (future, call, value)
             log.info("action_requested id=%s", value)
         else:
@@ -288,7 +308,7 @@ class Engine:
                         del self.calls[key]
                 if call is self.current:
                     self.current = None
-                    if call.callback_trigger and (self.config.callback["trigger_mode"] == "reject" or call.confirmed):
+                    if self.accepting and not getattr(call, "callback_suppressed", False) and call.callback_trigger and (self.config.callback["trigger_mode"] == "reject" or call.confirmed):
                         self.pending = (time.monotonic() + self.config.callback["delay_ms"] / 1000, call.caller)
         elif kind == "media" and not call.disconnected and not call.callback_trigger:
             call.attach_media()
@@ -307,6 +327,7 @@ class Engine:
                 log.info("dialog_listening state=%s wait_seconds=%s", call.session.state, self.config.dialog["listen_timeout_seconds"])
 
     def step(self):
+        self.drain_control()
         self.endpoint.libHandleEvents(20)
         for _ in range(100):
             try:
@@ -318,7 +339,7 @@ class Engine:
         if self.pending and now >= self.pending[0]:
             _, caller = self.pending
             self.pending = None
-            if self.registered:
+            if self.registered and self.accepting:
                 call = Call(self)
                 call.caller = caller
                 self.current = call
@@ -401,25 +422,58 @@ class Engine:
                     log.info("speech_empty_result ignored=True")
         self.dispatch(call, self.dialog.tick(call.session, now))
 
+    def drain_control(self):
+        if not self.bridge:
+            return
+        for _ in range(100):
+            try:
+                enabled = self.bridge.commands.get_nowait()
+            except queue.Empty:
+                break
+            self.accepting = enabled
+            if not enabled:
+                self.pending = None
+                if self.current and self.current.callback_trigger:
+                    self.current.callback_suppressed = True
+            log.info('call_acceptance enabled=%s', enabled)
+            self.health()
+
+    def snapshot(self):
+        active = any(call.confirmed and not call.disconnected for call in self.calls.values())
+        connected = self.bridge.connected if self.bridge else None
+        return {
+            'registered': self.registered, 'registration_code': self.registration_code,
+            'speech_ready': self.speech is not None, 'busy': bool(self.busy),
+            'dropped_logs': sum(getattr(handler, 'dropped', 0) for handler in logging.getLogger().handlers),
+            'accepting': self.accepting, 'call_active': active, 'adapter_connected': connected,
+            'status': operating_status(stopping=self.stopping, starting=self.starting,
+                error=not self.registered or self.speech is None or connected is False,
+                busy=self.busy, accepting=self.accepting),
+        }
+
     def health(self):
-        path = self.config.data_dir / "health.json"
-        temporary = path.with_suffix(".tmp")
-        temporary.write_text(json.dumps({"at": time.time(), "registered": self.registered, "registration_code": self.registration_code, "speech_ready": self.speech is not None, "busy": bool(self.busy)}), encoding="utf-8")
-        temporary.replace(path)
+        snapshot = self.snapshot()
+        changed = snapshot != self.last_snapshot
+        now = time.monotonic()
+        if changed or now - self.last_health_at >= 2:
+            write_status({'at': time.time(), **snapshot})
+            self.last_health_at = now
+            self.last_snapshot = snapshot
+        if self.bridge:
+            self.bridge.update(snapshot)
 
     def run(self, duration=None) -> bool:
         for sig in (signal.SIGINT, signal.SIGTERM):
             signal.signal(sig, lambda *_: setattr(self, "stopping", True))
-        start, last_health = time.monotonic(), 0
+        start = time.monotonic()
         registered_once = False
         try:
             while not self.stopping and (duration is None or time.monotonic() - start < duration):
                 self.step()
                 registered_once |= self.registered
-                if time.monotonic() - last_health >= 2:
-                    self.health()
-                    last_health = time.monotonic()
+                self.health()
         finally:
+            self.stopping = True
             self.pending = None
             for call in list(self.calls.values()):
                 call.end()
@@ -432,8 +486,10 @@ class Engine:
             self.current = None
             self.account.shutdown()
             self.endpoint.libDestroy()
-            if self.openhab:
-                self.openhab.close()
+            if self.adapter:
+                self.adapter.close()
             self.registered = False
             self.health()
+            if self.bridge:
+                self.bridge.close()
         return registered_once

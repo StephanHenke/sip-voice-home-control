@@ -28,6 +28,7 @@ COPY src ./src
 RUN pip install --no-cache-dir '.[voice]'
 COPY scripts/smoke_runtime.py /app/scripts/smoke_runtime.py
 COPY scripts/verify_speech.py /app/scripts/verify_speech.py
+COPY scripts/remove_legacy_runtime.py /app/scripts/remove_legacy_runtime.py
 COPY config.example.yaml /app/config.example.yaml
 USER controller
 ENV PYTHONUNBUFFERED=1 OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1

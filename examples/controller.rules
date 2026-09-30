@@ -1,0 +1,9 @@
+rule "Voice controller heartbeat expired"
+when
+    Item VoiceController_Heartbeat changed to UNDEF
+then
+    VoiceController_Status.postUpdate("OFFLINE")
+    // Unknown, not OFF: a lost heartbeat does not prove the call ended.
+    VoiceController_CallActive.postUpdate(UNDEF)
+    VoiceController_AcceptCalls.postUpdate(UNDEF)
+end
