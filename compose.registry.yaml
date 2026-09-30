@@ -1,0 +1,6 @@
+# Requires Docker Compose >= 2.24.4. Uses the published image without a local build.
+# Override VOICE_HOME_IMAGE to use Docker Hub, a version tag, or a pinned digest.
+services:
+  controller:
+    build: !reset null
+    image: ${VOICE_HOME_IMAGE:?Set VOICE_HOME_IMAGE to your published container image}
