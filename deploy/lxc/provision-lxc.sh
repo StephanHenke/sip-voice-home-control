@@ -42,8 +42,13 @@ pct start "$ctid"
 pct exec "$ctid" -- bash -s <<'INSTALL'
 set -Eeuo pipefail
 export DEBIAN_FRONTEND=noninteractive
+for ((attempt=0; attempt<30; attempt++)); do
+  if getent ahostsv4 download.docker.com >/dev/null; then break; fi
+  sleep 2
+done
+getent ahostsv4 download.docker.com >/dev/null || { echo 'DHCP/DNS not ready in the LXC.' >&2; exit 1; }
 apt-get update
-apt-get install -y curl ca-certificates python3
+apt-get install -y curl ca-certificates python3 openssl
 install -m 0755 -d /etc/apt/keyrings
 curl -fsSL https://download.docker.com/linux/debian/gpg -o /etc/apt/keyrings/docker.asc
 chmod a+r /etc/apt/keyrings/docker.asc

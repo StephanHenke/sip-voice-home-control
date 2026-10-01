@@ -106,6 +106,23 @@ Bereits durchgeführte Prüfungen stehen in [VALIDATION.md](docs/VALIDATION.md).
 - Optionale Bestätigungsfrage je Aktion; Ausführung erst nach einem expliziten „Ja“.
 - Erweiterung um Lichtaktionen über Konfiguration, ohne ein Sprachmodell umzuprogrammieren.
 
+## Easy Start auf Proxmox
+
+Der [geführte LXC-Installer](docs/EASY_START.md) legt auf einem Proxmox-Host einen
+neuen LXC an, installiert Docker und startet den Controller mit geschützter
+Weboberfläche. Storage, Netzwerkbrücke, Debian-Vorlage und Image werden abgefragt;
+ein eigenes Webpasswort ist Pflicht.
+
+Aus einem Checkout auf der Proxmox-Root-Konsole:
+
+```bash
+python3 deploy/lxc/easy-start.py --source-dir .
+```
+
+Danach SIP, openHAB und Aktionen im Webeditor einrichten. Bis dahin bleiben
+Anrufe und Geräteaktionen gesperrt. Einzeldatei-Download, private Registries und
+Updates sind in der [Easy-Start-Anleitung](docs/EASY_START.md) beschrieben.
+
 ## Schnellstart auf Linux (amd64)
 
 Voraussetzungen: Docker Engine mit Compose, Verbindung zur FRITZ!Box und zu openHAB.

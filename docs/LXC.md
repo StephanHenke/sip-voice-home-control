@@ -5,6 +5,10 @@ Controller. Sie aktivieren keine Tür-/Toraktionen für einen Test.
 
 ## Erstinstallation
 
+Für eine geführte Installation inklusive Docker, Weboberfläche und Update-Skript
+den [Easy-Start-Assistenten](EASY_START.md) verwenden. Der folgende Ablauf beschreibt
+die manuelle Variante mit dem separaten Provisionierungsskript.
+
 Auf einem Proxmox-Knoten eine freie ID, einen vorhandenen Debian-Templatepfad,
 Storage und Bridge auswählen. Beispiel (IDs und Storage vorher prüfen):
 
