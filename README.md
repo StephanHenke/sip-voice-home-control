@@ -6,6 +6,41 @@ Lokale Sprachsteuerung für openHAB über Telefonanrufe an eine FRITZ!Box.
 Ein Linux-Docker-Container, CPU-Verarbeitung, kein LLM, keine Cloud-Sprachdienste.
 Ausgelegt für kurze deutsche Befehle, beispielsweise von einer Xplora-Uhr.
 
+## Warum ein Anruf von der Kinderuhr?
+
+Bei Kinderuhren, auf denen sich keine zusätzlichen Apps installieren lassen,
+steht keine eigene Smart-Home-App zur Verfügung. Telefonieren ist dennoch möglich.
+SIP Voice Home Control nutzt diesen Weg: Das Kind ruft einen gespeicherten Kontakt
+an und spricht seinen Wunsch aus. Auf der Uhr wird keine zusätzliche App benötigt.
+Spracherkennung und Ansagen laufen lokal auf dem Controller.
+
+Über die konfigurierten openHAB-Aktionen lässt sich beispielsweise:
+
+- die **Haustür entriegeln und die Falle ziehen**,
+- das **Garagentor öffnen oder schließen**,
+- das **Licht ein- oder ausschalten**.
+
+Die gewünschten Geräte müssen bereits passend an openHAB angebunden sein.
+Welche Aktionen verfügbar sind und ob vorher eine ausdrückliche Bestätigung
+abgefragt wird, legt die Konfiguration fest. Derselbe Sprachdienst lässt sich
+auch von einem normalen Telefon aus nutzen.
+
+### Rückruf als zusätzliche Sicherheitsbarriere
+
+Eine angezeigte Rufnummer allein ist kein sicherer Identitätsnachweis: Sie kann
+gefälscht werden (**Caller-ID-Spoofing**). Deshalb kann pro freigegebener Nummer
+die Rückrufvariante `access_mode: callback` gewählt werden; sie ist der Standard.
+Der erste Anruf löst lediglich den Rückruf aus. Der Controller beendet ihn und
+ruft ausschließlich die **fest in der Konfiguration hinterlegte Nummer** zurück.
+Erst auf dieser ausgehenden Verbindung beginnt der Sprachdialog.
+
+Damit reicht eine gefälschte Caller-ID allein nicht aus, um auf der eingehenden
+Verbindung einen Öffnungsbefehl auszuführen. Der Angreifer müsste zusätzlich den
+Rückruf am hinterlegten Anschluss entgegennehmen können. Zugriff auf die Uhr,
+den Telefonanschluss oder eine eingerichtete Rufumleitung wird durch diesen
+Schutz nicht ausgeschlossen. Ablauf und Einstellungen stehen unter
+[Anrufer und Rückruf](#anrufer-und-rückruf).
+
 ## Nutzung auf eigene Gefahr und Verantwortung
 
 **Installation, Konfiguration und Nutzung erfolgen auf eigene Gefahr und in eigener
@@ -329,6 +364,20 @@ keine bereits gemessenen Zusagen. Verbindungsaufbau und Anfangspausen werden sep
 Der Healthcheck prüft eine aktuelle Prozessmeldung, SIP-Registrierung und geladene
 Sprachkomponenten. `doctor` prüft openHAB gesondert. Docker startet einen abgestürzten
 Prozess neu; ein bloßer Status `unhealthy` löst durch Compose keinen Neustart aus.
+
+## Offene Aufgaben
+
+Diese Erweiterungen sind noch nicht implementiert:
+
+- [ ] **DTMF-Steuerung:** Aktionen und Bestätigungen alternativ über die
+  Telefontastatur auswählen. Das setzt voraus, dass das anrufende Gerät während
+  des Gesprächs DTMF-Töne senden kann.
+- [ ] **Vorab aufgenommene Sprachdateien:** Eigene Aufnahmen einer Person,
+  beispielsweise für Begrüßung, Rückfragen und Erfolgs- oder Fehlermeldungen,
+  als Alternative zur synthetischen Sprachausgabe verwenden. Dazu gehören eine
+  konfigurierbare Zuordnung der Audiodateien und eine Prüfung des Audioformats.
+  Dynamische Inhalte wie Namen benötigen passende Aufnahmen oder eine
+  ergänzende TTS-Ansage.
 
 ## Komponenten und Lizenzen
 
