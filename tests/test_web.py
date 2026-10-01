@@ -119,12 +119,12 @@ def test_bootstrap_change_persists_and_revokes_sessions(store, tmp_path):
     admin = web.Admin(store.path, auth)
     token, _ = admin.login('admin', 'first')
     other, _ = admin.login('admin', 'second')
-    assert admin.session(token)[3] is True
+    assert admin.session(token)
     with pytest.raises(ValueError):
-        admin.change_password(token, 'wrong', 'personal-password-123', 'first')
+        admin.change_password(token, 'wrong', 'x', 'first')
     with pytest.raises(ValueError):
-        admin.change_password(token, 'admin', 'short', 'first')
-    admin.change_password(token, 'admin', 'personal-password-123', 'first')
+        admin.change_password(token, 'admin', '', 'first')
+    admin.change_password(token, 'admin', 'x', 'first')
     assert admin.session(token) is None
     assert admin.session(other) is None
     saved = auth.read_bytes()
@@ -132,14 +132,17 @@ def test_bootstrap_change_persists_and_revokes_sessions(store, tmp_path):
     assert auth.read_bytes() == saved
     restarted = web.Admin(store.path, auth)
     assert restarted.login('admin', 'third') is None
-    token, _ = restarted.login('personal-password-123', 'third')
-    assert restarted.session(token)[3] is False
-    assert b'personal-password-123' not in saved
+    token, _ = restarted.login('x', 'third')
+    assert restarted.session(token)
+    assert b'x' not in saved
 
 
-def test_bootstrap_http_blocks_all_management_until_change(store, tmp_path):
+def test_bootstrap_http_allows_management_and_optional_short_password(store, tmp_path):
     auth = tmp_path / 'password.json'
     web.initialize_password(auth)
+    legacy = json.loads(auth.read_text())
+    legacy['must_change'] = True
+    auth.write_text(json.dumps(legacy))
     admin = web.Admin(store.path, auth)
     server = ThreadingHTTPServer(('127.0.0.1', 0), web.handler(admin))
     threading.Thread(target=server.serve_forever, daemon=True).start()
@@ -151,16 +154,11 @@ def test_bootstrap_http_blocks_all_management_until_change(store, tmp_path):
             data=json.dumps(data).encode() if data is not None else None,
             headers=selected_headers or headers), timeout=5)
     try:
-        assert json.load(request('/api/session'))['must_change_password']
+        assert json.load(request('/api/session'))['csrf'] == csrf
         for path in ('config', 'download', 'versions', 'logs', 'status'):
-            with pytest.raises(urllib.error.HTTPError) as error:
-                request('/api/'+path)
-            assert error.value.code == 403
-        for path in ('save', 'validate', 'restart'):
-            with pytest.raises(urllib.error.HTTPError) as error:
-                request('/api/'+path, {})
-            assert error.value.code == 403
-        data = {'current_password': 'admin', 'new_password': 'personal-password-123'}
+            assert request('/api/'+path).status == 200
+        assert request('/api/validate', {'yaml': store.read()['yaml']}).status == 200
+        data = {'current_password': 'admin', 'new_password': 'x'}
         with pytest.raises(urllib.error.HTTPError) as error:
             request('/api/password', data, {'Cookie': 'session='+token, 'Content-Type': 'application/json'})
         assert error.value.code == 403
@@ -171,3 +169,11 @@ def test_bootstrap_http_blocks_all_management_until_change(store, tmp_path):
     finally:
         server.shutdown()
         server.server_close()
+
+
+def test_console_accepts_short_password(store, tmp_path, monkeypatch):
+    auth = tmp_path / 'password.json'
+    answers = iter(['a', 'a'])
+    monkeypatch.setattr(web.getpass, 'getpass', lambda _: next(answers))
+    web.reset_password(auth)
+    assert web.Admin(store.path, auth).login('a', 'test')
