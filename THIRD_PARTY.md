@@ -1,7 +1,8 @@
 # Komponenten
 
 Die Anwendung bindet folgende externe Komponenten ein. Deren Lizenztexte und
-Modellkarten gelten unabhängig von der noch nicht gewählten Projektlizenz.
+Modellkarten gelten unabhängig von der Projektlizenz GPL-3.0-or-later.
+Die Projektlizenz lizenziert fremde Komponenten nicht um.
 
 | Komponente | Referenz |
 |---|---|
@@ -14,3 +15,16 @@ Modellkarten gelten unabhängig von der noch nicht gewählten Projektlizenz.
 Der Modell-Downloader verwendet eine feste Piper-Repository-Revision und speichert
 Download-URLs sowie SHA-256-Prüfsummen im Image unter `/models/manifest.json`.
 Es werden keine externen Trainingsdaten oder Modelle im Git-Repository gespeichert.
+
+## Weitergabe von Container-Images
+
+Bei Weitergabe eines Images müssen die Lizenz- und Hinweispflichten aller
+enthaltenen Komponenten erfüllt werden. Für GPL-Komponenten gehört dazu der
+entsprechende Quellcode einschließlich erforderlicher Build-Skripte gemäß der
+jeweiligen Lizenz. Diese Übersicht und Links auf fremde Repositories allein
+sind kein vollständiger Nachweis der Erfüllung dieser Pflichten.
+
+Vor einer öffentlichen Image-Veröffentlichung sind die tatsächlich eingebauten
+Versionen einschließlich transitiver Abhängigkeiten, Lizenztexte und die
+zugehörige Quellcodebereitstellung zu prüfen. Die Wahl der Projektlizenz ersetzt
+diese Prüfung nicht.

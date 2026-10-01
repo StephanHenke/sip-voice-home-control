@@ -400,8 +400,18 @@ Diese Erweiterungen sind noch nicht implementiert:
 
 ## Komponenten und Lizenzen
 
-Siehe [THIRD_PARTY.md](THIRD_PARTY.md). Das Repository ist zunächst privat.
-Eine eigene Veröffentlichungslizenz ist noch nicht festgelegt.
+Dieses Projekt steht unter der **GNU General Public License v3.0 oder neuer
+(GPL-3.0-or-later)**. Den vollständigen Lizenztext enthält [LICENSE](LICENSE).
+
+Du darfst die Software nutzen, verändern und weitergeben, auch kommerziell.
+Bei Weitergabe gelten die GPL-Bedingungen, insbesondere zur Bereitstellung des
+zugehörigen Quellcodes. Eine zusätzliche Zustimmung für kommerzielle Nutzung
+ist nicht erforderlich.
+
+Die Software wird ohne Gewährleistung im Umfang der Lizenz bereitgestellt;
+maßgeblich sind insbesondere deren Abschnitte 15 bis 17.
+Eingebundene Bibliotheken und Sprachmodelle behalten ihre jeweiligen Lizenzen.
+Hinweise dazu stehen in [THIRD_PARTY.md](THIRD_PARTY.md).
 
 
 ### Schreibarmer Betrieb

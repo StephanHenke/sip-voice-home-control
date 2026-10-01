@@ -14,6 +14,7 @@ RUN CFLAGS=-fPIC CXXFLAGS=-fPIC ./configure --disable-sound --disable-video --di
     && mkdir /wheels && cp pjsip-apps/src/swig/python/dist/*.whl /wheels/
 
 FROM python:3.12-slim-bookworm AS runtime
+LABEL org.opencontainers.image.licenses="GPL-3.0-or-later"
 RUN apt-get update && apt-get install -y --no-install-recommends libssl3 libopus0 libstdc++6 libespeak-ng1 ca-certificates \
     && rm -rf /var/lib/apt/lists/* \
     && useradd --uid 10001 --create-home controller \
@@ -24,6 +25,7 @@ WORKDIR /app
 COPY scripts/download_models.py /app/scripts/download_models.py
 RUN python /app/scripts/download_models.py
 COPY pyproject.toml ./
+COPY LICENSE THIRD_PARTY.md ./
 COPY src ./src
 RUN pip install --no-cache-dir '.[voice]'
 COPY scripts/smoke_runtime.py /app/scripts/smoke_runtime.py
