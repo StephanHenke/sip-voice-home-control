@@ -25,6 +25,7 @@ Bereits durchgeführte Prüfungen stehen in [VALIDATION.md](docs/VALIDATION.md).
 - [Teststand](docs/VALIDATION.md) und [Abnahmecheckliste](docs/ACCEPTANCE.md).
 
 - [Betrieb, Anrufsteuerung, RAM-Status und Adapter](docs/OPERATIONS.md).
+- [openHAB-Anrufsteuerung einrichten und bedienen](docs/OPENHAB_CONTROL.md).
 
 ## Funktionen
 
