@@ -1,7 +1,7 @@
 # Geräte über YAML konfigurieren
 
 Alle Item-Namen und Befehle stehen pro Aktion unter `actions` in `config.yaml`
-(im lokalen Testaufbau `config.local.yaml`). Im Python-Code sind keine privaten
+(alternativ in einer eigenen lokalen YAML-Datei). Im Python-Code sind keine privaten
 Item-Namen hinterlegt. `command_item` empfängt den Befehl, `feedback_item` liefert
 die tatsächliche Rückmeldung. Beide dürfen dasselbe Item benennen.
 

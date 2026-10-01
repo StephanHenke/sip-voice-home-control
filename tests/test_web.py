@@ -113,18 +113,24 @@ def test_http_auth_csrf_and_download(store, tmp_path):
         server.server_close()
 
 
-def test_bootstrap_change_persists_and_revokes_sessions(store, tmp_path):
+def test_bootstrap_change_persists_and_revokes_sessions(store, tmp_path, monkeypatch):
     auth = tmp_path / 'password.json'
     web.initialize_password(auth)
     admin = web.Admin(store.path, auth)
-    token, _ = admin.login('admin', 'first')
-    other, _ = admin.login('admin', 'second')
+    assert json.loads(auth.read_text()) == {}
+    assert admin.login('admin', 'first') is None
+    assert admin.login('', 'first') is None
+    answers = iter(['personal password', 'personal password'])
+    monkeypatch.setattr(web.getpass, 'getpass', lambda _: next(answers))
+    web.reset_password(auth)
+    token, _ = admin.login('personal password', 'first')
+    other, _ = admin.login('personal password', 'second')
     assert admin.session(token)
     with pytest.raises(ValueError):
         admin.change_password(token, 'wrong', 'x', 'first')
     with pytest.raises(ValueError):
-        admin.change_password(token, 'admin', '', 'first')
-    admin.change_password(token, 'admin', 'x', 'first')
+        admin.change_password(token, 'personal password', '', 'first')
+    admin.change_password(token, 'personal password', 'x', 'first')
     assert admin.session(token) is None
     assert admin.session(other) is None
     saved = auth.read_bytes()
@@ -137,17 +143,16 @@ def test_bootstrap_change_persists_and_revokes_sessions(store, tmp_path):
     assert b'x' not in saved
 
 
-def test_bootstrap_http_allows_management_and_optional_short_password(store, tmp_path):
+def test_provisioned_http_allows_management_and_optional_short_password(store, tmp_path):
     auth = tmp_path / 'password.json'
-    web.initialize_password(auth)
-    legacy = json.loads(auth.read_text())
+    legacy = json.loads(web.password_record('personal password'))
     legacy['must_change'] = True
     auth.write_text(json.dumps(legacy))
     admin = web.Admin(store.path, auth)
     server = ThreadingHTTPServer(('127.0.0.1', 0), web.handler(admin))
     threading.Thread(target=server.serve_forever, daemon=True).start()
     base = f'http://127.0.0.1:{server.server_port}'
-    token, csrf = admin.login('admin', 'test')
+    token, csrf = admin.login('personal password', 'test')
     headers = {'Cookie': 'session='+token, 'X-CSRF-Token': csrf, 'Content-Type': 'application/json'}
     def request(path, data=None, selected_headers=None):
         return urllib.request.urlopen(urllib.request.Request(base+path,
@@ -158,7 +163,7 @@ def test_bootstrap_http_allows_management_and_optional_short_password(store, tmp
         for path in ('config', 'download', 'versions', 'logs', 'status'):
             assert request('/api/'+path).status == 200
         assert request('/api/validate', {'yaml': store.read()['yaml']}).status == 200
-        data = {'current_password': 'admin', 'new_password': 'x'}
+        data = {'current_password': 'personal password', 'new_password': 'x'}
         with pytest.raises(urllib.error.HTTPError) as error:
             request('/api/password', data, {'Cookie': 'session='+token, 'Content-Type': 'application/json'})
         assert error.value.code == 403
@@ -177,3 +182,52 @@ def test_console_accepts_short_password(store, tmp_path, monkeypatch):
     monkeypatch.setattr(web.getpass, 'getpass', lambda _: next(answers))
     web.reset_password(auth)
     assert web.Admin(store.path, auth).login('a', 'test')
+
+
+@pytest.mark.parametrize('record', [None, '', '{}', 'null', '[]', '{', '{"salt":null,"hash":null}'])
+def test_unconfigured_or_invalid_record_blocks_login(store, tmp_path, record):
+    auth = tmp_path / 'password.json'
+    if record is not None:
+        auth.write_text(record)
+    admin = web.Admin(store.path, auth)
+    for password in ('', 'admin', 'arbitrary password'):
+        assert admin.login(password, 'test') is None
+
+
+def test_empty_hashed_password_cannot_authenticate(store, tmp_path):
+    auth = tmp_path / 'password.json'
+    salt = 'ab' * 16
+    auth.write_text(json.dumps({'salt': salt, 'hash': web.password_hash('', salt)}))
+    assert web.Admin(store.path, auth).login('', 'test') is None
+    with pytest.raises(ValueError):
+        web.password_record('')
+
+
+def test_unconfigured_http_denies_login_and_management(store, tmp_path):
+    auth = tmp_path / 'password.json'
+    web.initialize_password(auth)
+    server = ThreadingHTTPServer(('127.0.0.1', 0), web.handler(web.Admin(store.path, auth)))
+    threading.Thread(target=server.serve_forever, daemon=True).start()
+    base = f'http://127.0.0.1:{server.server_port}'
+    try:
+        for password in ('', 'admin'):
+            request = urllib.request.Request(base + '/api/login',
+                data=json.dumps({'password': password}).encode(), headers={'Content-Type': 'application/json'})
+            with pytest.raises(urllib.error.HTTPError) as error:
+                urllib.request.urlopen(request, timeout=5)
+            assert error.value.code == 401
+        with pytest.raises(urllib.error.HTTPError) as error:
+            urllib.request.urlopen(base + '/api/config', timeout=5)
+        assert error.value.code == 401
+    finally:
+        server.shutdown()
+        server.server_close()
+
+
+def test_password_record_has_only_salted_hash():
+    first = json.loads(web.password_record('unique test password'))
+    second = json.loads(web.password_record('unique test password'))
+    assert set(first) == {'salt', 'hash'}
+    assert first != second
+    assert first['hash'] == web.password_hash('unique test password', first['salt'])
+    assert 'unique test password' not in json.dumps(first)

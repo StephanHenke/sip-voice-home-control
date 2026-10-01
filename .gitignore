@@ -19,3 +19,8 @@ models/
 .publish.json
 %USERP~1/
 .build/
+web/
+*.key
+*.pem
+config/.versions/
+config/

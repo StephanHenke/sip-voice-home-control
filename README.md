@@ -73,6 +73,7 @@ Bereits durchgeführte Prüfungen stehen in [VALIDATION.md](docs/VALIDATION.md).
 
 Voraussetzungen: Docker Engine mit Compose, Verbindung zur FRITZ!Box und zu openHAB.
 Als Ausgangspunkt zwei CPU-Kerne und 2 GB RAM einplanen; reale Last und Latenz messen.
+`OWNER` durch den Eigentümer des verwendeten Repositorys ersetzen.
 
 ```bash
 git clone https://github.com/OWNER/sip-voice-home-control.git
@@ -96,9 +97,11 @@ Das Image enthält PJSIP, Vosk und Piper samt deutschen Modellen. Downloads erfo
 beim Build. Beim ersten Start werden die persönlichen Ansagen erzeugt. Danach
 benötigt die Sprachverarbeitung keinen Internetzugriff.
 
-**Dateien mit persönlichen Daten:** `config.yaml`, `config.local.yaml`, `secrets/`
-und `data/` sind in Git und im Docker-Build-Kontext ausgeschlossen. Passwörter,
+**Dateien mit persönlichen Daten:** `config.yaml`, `config.local.yaml`, `config/`,
+`secrets/`, `web/`, `.env` und `data/` sind in Git und im Docker-Build-Kontext ausgeschlossen. Passwörter,
 echte Rufnummern und private Item-Namen gehören nicht in Beispiele oder Issues.
+Beispieladressen und synthetische Rufnummern in Tests sind keine vorkonfigurierten
+Zugänge oder freigegebenen Anrufer. Die Beispiel-YAML enthält eine leere Anruferliste.
 
 ## FRITZ!Box und Uhr
 

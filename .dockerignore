@@ -13,3 +13,10 @@ models
 .publish.json
 %USERP~1
 .build
+.env
+.env.*
+web/
+*.key
+*.pem
+config/.versions/
+config/

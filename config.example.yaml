@@ -1,3 +1,4 @@
+# Nur Beispielwerte: Dokumentations-IP und Zugangsdaten vor dem Start ersetzen.
 region: DE
 data_dir: /data
 
@@ -16,7 +17,7 @@ sip:
 # Keine Freigabe ab Werk. Nummern ohne Platzhalter vollständig eintragen.
 callers: []
 #  - number: "+49..."
-#    name: "Anna"
+#    name: "Testperson"
 #    access_mode: callback  # Standard; direct ist ausdrücklich konfigurierbar
 
 dialog:

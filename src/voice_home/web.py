@@ -45,6 +45,8 @@ def password_hash(password, salt):
 
 
 def password_record(password):
+    if not isinstance(password, str) or not 1 <= len(password) <= 1024:
+        raise ValueError('Passwort darf nicht leer sein und höchstens 1024 Zeichen enthalten.')
     salt = secrets.token_hex(16)
     return json.dumps({'salt': salt, 'hash': password_hash(password, salt)})
 
@@ -54,7 +56,7 @@ def initialize_password(path=AUTH):
     try:
         with path.open('x', encoding='utf-8') as f:
             path.chmod(0o600)
-            f.write(password_record('admin'))
+            f.write('{}')  # Unconfigured: no password hash, so no login is possible.
             f.flush()
             os.fsync(f.fileno())
     except FileExistsError:
@@ -133,6 +135,8 @@ class Admin:
             return ''
 
     def login(self, password, ip):
+        if not isinstance(password, str) or not 1 <= len(password) <= 1024:
+            return None
         with self.lock:
             now = time.monotonic()
             attempts = self.attempts.setdefault(ip, deque(maxlen=5))
@@ -146,6 +150,8 @@ class Admin:
             try:
                 raw = self.auth.read_bytes()
                 data = json.loads(raw)
+                if not isinstance(data, dict) or not all(isinstance(data.get(key), str) for key in ('salt', 'hash')):
+                    return None
                 valid = hmac.compare_digest(password_hash(password, data['salt']), data['hash'])
             except (OSError, ValueError, KeyError, TypeError):
                 valid = False
