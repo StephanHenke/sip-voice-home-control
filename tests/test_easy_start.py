@@ -1,4 +1,3 @@
-import base64
 import importlib.util
 import json
 from pathlib import Path
@@ -26,18 +25,27 @@ def test_unknown_template_fails_closed():
         installer.initial_config('sip: {}')
 
 
-def test_downloads_one_immutable_revision(tmp_path, monkeypatch):
-    calls = []
-    def api(path, token=''):
-        calls.append(path)
-        if '/commits/' in path:
-            return {'sha': 'a' * 40}
-        return {'type': 'file', 'encoding': 'base64', 'content': base64.b64encode(b'test').decode()}
-    monkeypatch.setattr(installer, 'api', api)
-    installer.download_sources(tmp_path, 'example/project', 'main')
-    assert len(calls) == len(installer.FILES) + 1
-    assert all(path.endswith('?ref=' + 'a' * 40) for path in calls[1:])
-    assert all((tmp_path / f).read_bytes() == b'test' for f in installer.FILES)
+def test_standalone_unpacks_without_checkout_or_network(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(installer.shutil, 'copyfile', lambda *a: pytest.fail('Checkout dependency'))
+    installer.prepare_sources(tmp_path / 'unpacked')
+    for name, content in installer.BUNDLED_FILES.items():
+        assert (tmp_path / 'unpacked' / name).read_text(encoding='utf-8') == content
+
+
+def test_bundle_matches_reviewed_sources():
+    for name, content in installer.BUNDLED_FILES.items():
+        assert content == (ROOT / name).read_text(encoding='utf-8'), 'Run scripts/bundle_installer.py'
+
+
+@pytest.mark.parametrize('value,expected', [
+    ('ghcr.io/example/project', 'ghcr.io/example/project:latest'),
+    ('registry.example:5000/project', 'registry.example:5000/project:latest'),
+    ('example/project:v1', 'example/project:v1'),
+    ('example/project@sha256:' + 'a' * 64, 'example/project@sha256:' + 'a' * 64),
+])
+def test_latest_default_and_explicit_image_versions(value, expected):
+    assert installer.image_reference(value) == expected
 
 
 @pytest.mark.parametrize('image', ['-danger', 'image;touch /tmp/x', 'image\nSECRET'])
@@ -139,9 +147,9 @@ def test_main_complete_flow_with_simulated_proxmox(monkeypatch):
     original_is_dir = Path.is_dir
     monkeypatch.setattr(Path, 'is_dir', lambda self: True if self.as_posix() == '/etc/pve' else original_is_dir(self))
     monkeypatch.setattr(installer.sys, 'stdin', SimpleNamespace(isatty=lambda: True))
-    monkeypatch.setattr(installer.sys, 'argv', ['easy-start.py', '--source-dir', str(ROOT)])
+    monkeypatch.setattr(installer.sys, 'argv', ['easy-start.py', '--image', 'example/image'])
     monkeypatch.setattr(installer.shutil, 'which', lambda _: '/test/tool')
-    answers = iter(['200', '1', '1', '1', '1', 'example/image:latest', 'INSTALL'])
+    answers = iter(['200', '1', '1', '1', '1', 'INSTALL'])
     monkeypatch.setattr('builtins.input', lambda _: next(answers))
     calls = []
     def run(*args, **kwargs):

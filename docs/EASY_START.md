@@ -5,32 +5,30 @@ Proxmox-Hosts**. Er benötigt Python 3 aus Proxmox und keine zusätzlichen
 Python-Pakete. Unterstützt wird amd64 mit einer Debian-12- oder Debian-13-Vorlage.
 Der Installer nutzt die Proxmox-Werkzeuge `pvesh`, `pveam` und `pct`.
 
-## Start aus einem vorhandenen Checkout
+## Einzeldatei starten
 
-Repository auf den Proxmox-Host kopieren oder dort mit den eigenen
-GitHub-Zugriffsrechten klonen. Im Repository-Verzeichnis starten:
+`deploy/lxc/easy-start.py` herunterladen und auf den Proxmox-Host kopieren.
+Der Installer enthält alle benötigten Vorlagen bereits: LXC-Einrichtung,
+Compose-Dateien, Startkonfiguration und Update-Skript. Ein Repository-Checkout
+oder das Nachladen weiterer Quelldateien über die GitHub-API ist nicht nötig.
 
-```bash
-python3 deploy/lxc/easy-start.py --source-dir .
-```
-
-In diesem Modus stammen alle Installationsdateien aus dem Checkout. Das gewünschte
-Registry-Image wird abgefragt, beispielsweise
-`ghcr.io/OWNER/sip-voice-home-control:latest` (OWNER in Kleinschreibung ersetzen).
-
-## Einzeldatei / Download-Start
-
-Es genügt auch, `deploy/lxc/easy-start.py` herunterzuladen und auf den Proxmox-Host
-zu kopieren. Es lädt seine Begleitdateien selbst. `OWNER` ersetzen:
+Auf der Proxmox-Root-Konsole starten:
 
 ```bash
-python3 easy-start.py --repository OWNER/sip-voice-home-control
+python3 easy-start.py
 ```
 
-Bei einem privaten Repository fragt der Assistent bei Bedarf einen GitHub-Token
-mit Lesezugriff verdeckt ab. Dieser bleibt im RAM. Für einen bestimmten Quellstand
-`--ref COMMIT_ODER_TAG` ergänzen. Ein Branch wird zuerst zu einer Commit-ID aufgelöst;
-alle Begleitdateien stammen anschließend aus genau diesem Commit.
+Das gewünschte Container-Image wird abgefragt. Ohne Tag wird automatisch `latest`
+verwendet. Alternativ direkt angeben (`OWNER` in Kleinschreibung ersetzen):
+
+```bash
+python3 easy-start.py --image ghcr.io/OWNER/sip-voice-home-control:latest
+```
+
+Explizite Tags und Digests bleiben erhalten. Für reproduzierbare Installationen
+eine bestimmte Installer-Version und einen festen Image-Digest verwenden.
+`--repository OWNER/sip-voice-home-control` bleibt als Kurzform für den GHCR-Namen
+verfügbar; damit erfolgt kein Zugriff auf das Quellrepository.
 
 **Nur bei öffentlich erreichbarer Skriptdatei** ist dieser Start direkt von GitHub
 möglich. Er führt heruntergeladenen Code als root aus; Quelle zuvor prüfen:
@@ -47,7 +45,7 @@ möglich. Er führt heruntergeladenen Code als root aus; Quelle zuvor prüfen:
 
 Ein privates Repository liefert ohne Anmeldung keinen anonymen Download.
 In diesem Fall die Einzeldatei über die angemeldete GitHub-Oberfläche herunterladen
-oder den Checkout verwenden. Tokens nicht in URLs, Befehlszeilen oder Shell-History
+und auf den Host kopieren. Tokens nicht in URLs, Befehlszeilen oder Shell-History
 eintragen. Der Installer gehört zu diesem Projekt und ist keine Veröffentlichung
 des Community-Helper-Scripts-Projekts.
 
@@ -69,7 +67,8 @@ Falls ein Image nicht öffentlich abrufbar ist, werden Registry-Benutzer und Tok
 abgefragt. Der Token wird über stdin an `docker login` übergeben. Docker speichert
 diesen Login im LXC; ohne Credential-Helper ist das kein verschlüsselter
 Passwortspeicher. Der Webpasswortspeicher enthält dagegen ausschließlich Salt und
-scrypt-Hash. Repository- und Registry-Berechtigungen sind getrennte Zugriffsrechte.
+scrypt-Hash. Das Webpasswort wird vor der LXC-Erstellung, der Docker-Installation
+und dem Image-Pull verlangt. Ohne Passwort bleibt die Installation gesperrt.
 
 ## Danach im Webeditor
 
@@ -108,7 +107,7 @@ Der Easy-Start-Assistent selbst dient ausschließlich der Erstinstallation.
 
 Bei Abbruch wird ein bereits angelegter LXC nicht automatisch gelöscht. Die
 ausgegebene ID auf dem Host prüfen; bestehende Container werden nicht überschrieben.
-DHCP/DNS, Internetzugriff auf Paketquellen/GitHub/Registry sowie freie Kapazität
+DHCP/DNS, Internetzugriff auf Paketquellen/Template-Server/Registry sowie freie Kapazität
 auf den gewählten Storages sind Voraussetzungen. Port 8443 nur im vorgesehenen
 Verwaltungsnetz erreichbar machen. Das Skript ändert keine Router-Firewallregeln.
 
@@ -117,3 +116,16 @@ Startkonfiguration und Befehlsübergabe mit ersetzten Infrastrukturaufrufen.
 Eine vollständige Neuanlage auf einem realen Proxmox-Host ist separat abzunehmen.
 
 Referenz: [Proxmox-Containerdokumentation](https://pve.proxmox.com/pve-docs/chapter-pct.html).
+
+## Vorlagen weiterentwickeln
+
+Optional können Entwickler mit `--source-dir .` die Dateien eines lokalen
+Checkouts statt der eingebetteten Vorlagen verwenden. Nach Änderungen an diesen
+Vorlagen den Einzeldatei-Installer im Repository neu erzeugen:
+
+```bash
+python3 scripts/bundle_installer.py
+```
+
+Ein automatisierter Test prüft, dass die eingebetteten Dateien mit den überprüften
+Quelldateien übereinstimmen.

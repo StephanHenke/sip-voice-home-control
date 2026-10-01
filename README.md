@@ -111,12 +111,14 @@ Bereits durchgeführte Prüfungen stehen in [VALIDATION.md](docs/VALIDATION.md).
 Der [geführte LXC-Installer](docs/EASY_START.md) legt auf einem Proxmox-Host einen
 neuen LXC an, installiert Docker und startet den Controller mit geschützter
 Weboberfläche. Storage, Netzwerkbrücke, Debian-Vorlage und Image werden abgefragt;
-ein eigenes Webpasswort ist Pflicht.
+ein eigenes Webpasswort ist vor LXC-Erstellung und Image-Pull Pflicht. Ohne
+Image-Tag wird `latest` geladen. Alle Vorlagen sind in einer Datei eingebettet;
+ein Checkout ist nicht erforderlich.
 
-Aus einem Checkout auf der Proxmox-Root-Konsole:
+`deploy/lxc/easy-start.py` herunterladen und auf der Proxmox-Root-Konsole starten:
 
 ```bash
-python3 deploy/lxc/easy-start.py --source-dir .
+python3 easy-start.py
 ```
 
 Danach SIP, openHAB und Aktionen im Webeditor einrichten. Bis dahin bleiben
