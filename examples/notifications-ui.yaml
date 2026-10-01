@@ -1,0 +1,24 @@
+version: 1
+rules:
+  voice_controller_notifications:
+    label: "Sprachcontroller: Aktions-Push"
+    description: "Bestätigte Controller-Aktionen an alle openHAB-App-Geräte melden."
+    triggers:
+      - id: "1"
+        type: core.ItemCommandTrigger
+        configuration:
+          itemName: VoiceController_Notification
+    conditions: []
+    actions:
+      - id: "2"
+        type: script.ScriptAction
+        configuration:
+          type: application/javascript;version=ECMAScript-2021
+          script: |
+            const { actions } = require("openhab");
+            if (typeof event !== "undefined" && event.itemCommand != null) {
+              const message = String(event.itemCommand).trim();
+              if (message && message !== "NULL" && message !== "UNDEF") {
+                actions.NotificationAction.sendBroadcastNotification(message);
+              }
+            }
