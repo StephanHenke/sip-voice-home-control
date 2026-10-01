@@ -12,6 +12,8 @@ Bereits durchgeführte Prüfungen stehen in [VALIDATION.md](docs/VALIDATION.md).
 
 ## Dokumentation
 
+- [HTTPS-Konfigurationsoberfläche](docs/WEB_UI.md): YAML-Editor, Validierung,
+  Versionen, Upload/Download, Status, RAM-Logs und Passwort-Reset per Konsole.
 - [Automatische Images in GHCR und Docker Hub](docs/REGISTRY.md): Build, Tests,
   Veröffentlichung, Registry-Zugang und Installation ohne lokalen Build.
 
