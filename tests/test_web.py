@@ -111,3 +111,63 @@ def test_http_auth_csrf_and_download(store, tmp_path):
     finally:
         server.shutdown()
         server.server_close()
+
+
+def test_bootstrap_change_persists_and_revokes_sessions(store, tmp_path):
+    auth = tmp_path / 'password.json'
+    web.initialize_password(auth)
+    admin = web.Admin(store.path, auth)
+    token, _ = admin.login('admin', 'first')
+    other, _ = admin.login('admin', 'second')
+    assert admin.session(token)[3] is True
+    with pytest.raises(ValueError):
+        admin.change_password(token, 'wrong', 'personal-password-123', 'first')
+    with pytest.raises(ValueError):
+        admin.change_password(token, 'admin', 'short', 'first')
+    admin.change_password(token, 'admin', 'personal-password-123', 'first')
+    assert admin.session(token) is None
+    assert admin.session(other) is None
+    saved = auth.read_bytes()
+    web.initialize_password(auth)
+    assert auth.read_bytes() == saved
+    restarted = web.Admin(store.path, auth)
+    assert restarted.login('admin', 'third') is None
+    token, _ = restarted.login('personal-password-123', 'third')
+    assert restarted.session(token)[3] is False
+    assert b'personal-password-123' not in saved
+
+
+def test_bootstrap_http_blocks_all_management_until_change(store, tmp_path):
+    auth = tmp_path / 'password.json'
+    web.initialize_password(auth)
+    admin = web.Admin(store.path, auth)
+    server = ThreadingHTTPServer(('127.0.0.1', 0), web.handler(admin))
+    threading.Thread(target=server.serve_forever, daemon=True).start()
+    base = f'http://127.0.0.1:{server.server_port}'
+    token, csrf = admin.login('admin', 'test')
+    headers = {'Cookie': 'session='+token, 'X-CSRF-Token': csrf, 'Content-Type': 'application/json'}
+    def request(path, data=None, selected_headers=None):
+        return urllib.request.urlopen(urllib.request.Request(base+path,
+            data=json.dumps(data).encode() if data is not None else None,
+            headers=selected_headers or headers), timeout=5)
+    try:
+        assert json.load(request('/api/session'))['must_change_password']
+        for path in ('config', 'download', 'versions', 'logs', 'status'):
+            with pytest.raises(urllib.error.HTTPError) as error:
+                request('/api/'+path)
+            assert error.value.code == 403
+        for path in ('save', 'validate', 'restart'):
+            with pytest.raises(urllib.error.HTTPError) as error:
+                request('/api/'+path, {})
+            assert error.value.code == 403
+        data = {'current_password': 'admin', 'new_password': 'personal-password-123'}
+        with pytest.raises(urllib.error.HTTPError) as error:
+            request('/api/password', data, {'Cookie': 'session='+token, 'Content-Type': 'application/json'})
+        assert error.value.code == 403
+        assert request('/api/password', data).status == 200
+        with pytest.raises(urllib.error.HTTPError) as error:
+            request('/api/session')
+        assert error.value.code == 401
+    finally:
+        server.shutdown()
+        server.server_close()

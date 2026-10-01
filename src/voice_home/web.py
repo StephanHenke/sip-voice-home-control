@@ -44,13 +44,29 @@ def password_hash(password, salt):
     return hashlib.scrypt(password.encode(), salt=bytes.fromhex(salt), n=16384, r=8, p=1).hex()
 
 
+def password_record(password, must_change=False):
+    salt = secrets.token_hex(16)
+    return json.dumps({'salt': salt, 'hash': password_hash(password, salt), 'must_change': must_change})
+
+
+def initialize_password(path=AUTH):
+    path.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        with path.open('x', encoding='utf-8') as f:
+            path.chmod(0o600)
+            f.write(password_record('admin', must_change=True))
+            f.flush()
+            os.fsync(f.fileno())
+    except FileExistsError:
+        pass  # Never replace an existing personal password on restart or upgrade.
+
+
 def reset_password(path=AUTH):
     password = getpass.getpass('Neues Admin-Passwort (mindestens 12 Zeichen): ')
     if len(password) < 12 or password != getpass.getpass('Wiederholen: '):
         raise ValueError('Passwörter stimmen nicht überein oder sind zu kurz')
-    salt = secrets.token_hex(16)
     path.parent.mkdir(parents=True, exist_ok=True)
-    atomic(path, json.dumps({'salt': salt, 'hash': password_hash(password, salt)}))
+    atomic(path, password_record(password))
     print('Admin-Passwort gesetzt. Bestehende Sitzungen sind ungültig.')
 
 
@@ -136,7 +152,7 @@ class Admin:
             if not valid:
                 return None
             token, csrf = secrets.token_urlsafe(32), secrets.token_urlsafe(32)
-            self.sessions[token] = (now + 3600, hashlib.sha256(raw).hexdigest(), csrf)
+            self.sessions[token] = (now + 3600, hashlib.sha256(raw).hexdigest(), csrf, bool(data.get('must_change', False)))
             while len(self.sessions) > 32:
                 self.sessions.popitem(last=False)
             return token, csrf
@@ -148,6 +164,21 @@ class Admin:
                 return data
             self.sessions.pop(token, None)
             return None
+
+    def change_password(self, token, current, new, ip):
+        if not isinstance(new, str) or not 12 <= len(new) <= 1024:
+            raise ValueError('Neues Passwort muss 12 bis 1024 Zeichen lang sein.')
+        if not isinstance(current, str) or len(current) > 1024 or current == new:
+            raise ValueError('Aktuelles und neues Passwort müssen unterschiedlich sein.')
+        with self.lock:
+            if not self.session(token):
+                raise ValueError('Sitzung ungültig. Neu anmelden.')
+            verified = self.login(current, ip)
+            if not verified:
+                raise ValueError('Aktuelles Passwort falsch oder zu viele Versuche. Eine Minute warten.')
+            self.sessions.pop(verified[0], None)
+            atomic(self.auth, password_record(new))
+            self.sessions.clear()
 
     def can_restart(self):
         if self.child is not None and self.child.poll() is not None:
@@ -195,7 +226,9 @@ def handler(admin):
             if not session:
                 return self.respond(401, {'error': 'Bitte anmelden.'})
             if self.path == '/api/session':
-                return self.respond(200, {'csrf': session[2]})
+                return self.respond(200, {'csrf': session[2], 'must_change_password': session[3]})
+            if session[3]:
+                return self.respond(403, {'error': 'Zuerst das Startpasswort ändern.'})
             if self.path == '/api/config':
                 return self.respond(200, admin.store.read())
             if self.path == '/api/status':
@@ -233,7 +266,7 @@ def handler(admin):
                     if not result:
                         return self.respond(401, {'error': 'Anmeldung fehlgeschlagen. Nach fünf Versuchen eine Minute warten.'})
                     token, csrf = result
-                    return self.respond(200, {'csrf': csrf}, cookie=f'session={token}; Secure; HttpOnly; SameSite=Strict; Path=/; Max-Age=3600')
+                    return self.respond(200, {'csrf': csrf, 'must_change_password': admin.session(token)[3]}, cookie=f'session={token}; Secure; HttpOnly; SameSite=Strict; Path=/; Max-Age=3600')
                 token = self.token()
                 session = admin.session(token)
                 if not session or not hmac.compare_digest(self.headers.get('X-CSRF-Token', ''), session[2]):
@@ -242,6 +275,11 @@ def handler(admin):
                     with admin.lock:
                         admin.sessions.pop(token, None)
                     return self.respond(200, {}, cookie='session=; Secure; HttpOnly; SameSite=Strict; Path=/; Max-Age=0')
+                if self.path == '/api/password':
+                    admin.change_password(token, data.get('current_password'), data.get('new_password'), self.client_address[0])
+                    return self.respond(200, {'message': 'Passwort geändert. Bitte neu anmelden.'}, cookie='session=; Secure; HttpOnly; SameSite=Strict; Path=/; Max-Age=0')
+                if session[3]:
+                    return self.respond(403, {'error': 'Zuerst das Startpasswort ändern.'})
                 if self.path == '/api/validate':
                     admin.store.validate(data.get('yaml'))
                     return self.respond(200, {'message': 'YAML und Konfiguration gültig.'})
@@ -266,6 +304,7 @@ def handler(admin):
 
 
 def serve(config):
+    initialize_password()
     admin = Admin(config)
     class BoundedServer(ThreadingHTTPServer):
         slots = threading.BoundedSemaphore(16)
