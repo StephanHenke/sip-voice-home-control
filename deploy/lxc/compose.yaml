@@ -1,0 +1,25 @@
+services:
+  controller:
+    image: ${VOICE_HOME_IMAGE:?Set VOICE_HOME_IMAGE}
+    restart: unless-stopped
+    init: true
+    network_mode: host
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    mem_limit: 2g
+    cpus: 2
+    tmpfs:
+      - /tmp:size=128m,mode=1777
+    volumes:
+      - ./config:/config:ro
+      - ./secrets:/run/secrets:ro
+      - ./data:/data
+    healthcheck:
+      test: [CMD, voice-home, health]
+      interval: 10s
+      timeout: 5s
+      start_period: 120s
+      retries: 3
+    logging:
+      driver: none
