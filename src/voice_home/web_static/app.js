@@ -1,0 +1,26 @@
+'use strict';
+let csrf='', revision='', dirty=false, timer;
+const $=id=>document.getElementById(id), note=s=>{$('notice').textContent=s;};
+async function api(path,data){const r=await fetch('/api/'+path,{method:data?'POST':'GET',headers:data?{'Content-Type':'application/json','X-CSRF-Token':csrf}:{},body:data?JSON.stringify(data):undefined});const v=await r.json();if(!r.ok)throw Error(v.error||'Anfrage fehlgeschlagen');return v;}
+function locked(){clearInterval(timer);$('workspace').hidden=true;$('login').hidden=false;csrf='';}
+async function read(){const v=await api('config');$('editor').value=v.yaml;revision=v.revision;dirty=false;}
+async function versions(){const v=await api('versions');$('versions').replaceChildren();for(const name of v.versions){const a=document.createElement('a');a.textContent=name;a.href='/api/versions/'+encodeURIComponent(name);a.download=name;$('versions').append(a);}}
+const codes={0:'Noch keine SIP-Antwort',200:'Anmeldung erfolgreich',401:'Authentifizierung angefordert',403:'Zugang verweigert',404:'Teilnehmer nicht gefunden',408:'Zeitüberschreitung',423:'Registrierungsintervall zu kurz',500:'Serverfehler',503:'Dienst nicht verfügbar'};
+async function refresh(){const s=await api('status');$('status').replaceChildren();for(const [label,value] of [['Betrieb',s.status],['SIP-Code',(s.registration_code??'—')+' · '+(codes[s.registration_code]||'SIP-Rückmeldung')],['Annahme',s.accepting===null?'Unbekannt':s.accepting?'ON':'OFF'],['Gespräch',s.call_active===null?'Unbekannt':s.call_active?'Aktiv':'Keines'],['Adapter',s.adapter_connected===null?'Nicht aktiviert':s.adapter_connected?'Verbunden':'Getrennt'],['Aktualität',s.fresh?'Aktuell':'Veraltet / fehlt']]){const div=document.createElement('div');div.className='metric';div.textContent=label;const b=document.createElement('strong');b.textContent=value??'Unbekannt';div.append(b);$('status').append(div);}$('pending').textContent=s.pending_changes?'Gespeicherte Änderungen warten auf Neustart.':'Gespeicherte Konfiguration entspricht dem gestarteten Stand.';$('logs').textContent=(await api('logs')).text;}
+async function enter(){csrf=(await api('session')).csrf;$('login').hidden=true;$('workspace').hidden=false;await read();await versions();await refresh();clearInterval(timer);timer=setInterval(()=>refresh().catch(e=>{note(e.message);}),3000);}
+async function action(fn){try{await fn();}catch(e){note(e.message);}}
+$('loginForm').onsubmit=e=>{e.preventDefault();action(async()=>{await api('login',{password:$('password').value});$('password').value='';await enter();note('Angemeldet.');});};
+$('logout').onclick=()=>action(async()=>{await api('logout',{});locked();});
+$('editor').oninput=()=>{dirty=true;};$('editor').onkeyup=()=>{$('position').textContent='Zeile '+$('editor').value.slice(0,$('editor').selectionStart).split('\n').length;};
+$('editor').onkeydown=e=>{if(e.key==='Tab'){e.preventDefault();const t=e.target,a=t.selectionStart,b=t.selectionEnd;t.setRangeText('  ',a,b,'end');dirty=true;}};
+$('read').onclick=()=>{if(!dirty||confirm('Ungespeicherte Änderungen verwerfen?'))action(read);};
+$('validate').onclick=()=>action(async()=>note((await api('validate',{yaml:$('editor').value})).message));
+$('save').onclick=()=>action(async()=>{const v=await api('save',{yaml:$('editor').value,revision});revision=v.revision;dirty=false;note(v.message);await versions();await refresh();});
+$('upload').onchange=()=>action(async()=>{const file=$('upload').files[0];if(!file)return;if(file.size>262144)throw Error('Datei zu groß (maximal 256 KiB).');if(dirty&&!confirm('Editorinhalt durch Upload ersetzen?'))return;const text=await file.text();$('editor').value=text;dirty=true;note('Upload im Editor. Noch nicht gespeichert.');await api('validate',{yaml:text});note('Upload gültig. Zum Übernehmen zuerst speichern.');});
+$('restart').onclick=()=>action(async()=>{if(dirty)throw Error('Zuerst speichern oder ungespeicherte Änderungen verwerfen.');if(!confirm('Controller neu starten? Die Verbindung zur Oberfläche wird kurz unterbrochen.'))return;note((await api('restart',{})).message);locked();});
+window.addEventListener('beforeunload',e=>{if(dirty){e.preventDefault();e.returnValue='';}});
+enter().catch(locked);
+
+function highlight(){const out=$('highlight');out.replaceChildren();$('editor').value.split('\n').forEach((line,i)=>{const row=document.createElement('div'),number=document.createElement('span');number.className='line-number';number.textContent=String(i+1).padStart(3)+'  ';row.append(number);const match=line.match(/^(\s*(?:-\s*)?)([\w.-]+)(:)(.*)$/);if(line.trimStart().startsWith('#')){const c=document.createElement('span');c.className='comment';c.textContent=line;row.append(c);}else if(match){row.append(document.createTextNode(match[1]));const k=document.createElement('span');k.className='key';k.textContent=match[2];row.append(k,document.createTextNode(match[3]+match[4]));}else row.append(document.createTextNode(line));out.append(row);});}
+$('syntax').ontoggle=()=>{if($('syntax').open)highlight();};
+$('editor').addEventListener('input',()=>{if($('syntax').open)highlight();});

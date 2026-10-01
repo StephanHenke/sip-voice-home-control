@@ -111,6 +111,13 @@ def configure(settings, secrets=()):
     handler.addFilter(SafeFilter(secrets))
     handler.setFormatter(SyslogFormatter(settings['facility']) if target == 'syslog' else logging.Formatter('%(asctime)s %(levelname)s %(message)s'))
     root.addHandler(handler)
+    if os.getenv('VOICE_HOME_WEB_LOG') == '1':
+        ram_path = Path('/tmp/voice-home/web.log')
+        ram_path.parent.mkdir(parents=True, exist_ok=True)
+        ram = RotatingFileHandler(ram_path, maxBytes=65536, backupCount=1, encoding='utf-8')
+        ram.addFilter(SafeFilter(secrets))
+        ram.setFormatter(logging.Formatter('%(asctime)s %(levelname)s %(message)s'))
+        root.addHandler(ram)
     return handler
 
 

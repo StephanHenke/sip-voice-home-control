@@ -18,6 +18,8 @@ def main():
     sub.add_parser("validate", help="Konfiguration prüfen, keine Verbindungen")
     sub.add_parser("doctor", help="openHAB lesend prüfen, keine Befehle senden")
     sub.add_parser("serve", help="SIP und Sprachdialog starten")
+    sub.add_parser("web", help="HTTPS-Administration und Controller starten")
+    sub.add_parser("web-password", help="Admin-Passwort interaktiv zurücksetzen")
     probe = sub.add_parser("register", help="Nur SIP-Anmeldung testen; alle Anrufe ablehnen")
     probe.add_argument("--seconds", type=float, default=15)
     sub.add_parser("status", help="Aktuellen Betriebszustand als JSON ausgeben")
@@ -26,6 +28,14 @@ def main():
     parse.add_argument("text")
     args = parser.parse_args()
     try:
+        if args.command == 'web-password':
+            from .web import reset_password
+            reset_password()
+            return
+        if args.command == 'web':
+            from .web import serve
+            serve(args.config)
+            return
         config = load(args.config)
         if args.command in {'serve', 'register'}:
             suppress_native_output()

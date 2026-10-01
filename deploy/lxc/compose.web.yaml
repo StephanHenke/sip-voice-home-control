@@ -1,0 +1,12 @@
+# Optional HTTPS editor. /web is separate from the editable configuration.
+services:
+  controller:
+    command: [web]
+    environment:
+      VOICE_HOME_WEB_BIND: ${VOICE_HOME_WEB_BIND:-0.0.0.0}
+      VOICE_HOME_WEB_PORT: "8443"
+    volumes: !override
+      - ./config:/config
+      - ./secrets:/run/secrets:ro
+      - ./data:/data
+      - ./web:/web

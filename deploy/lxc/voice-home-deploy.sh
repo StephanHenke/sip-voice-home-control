@@ -6,6 +6,7 @@ cd /opt/sip-voice-home
 exec 9>/run/lock/voice-home-deploy.lock
 flock -n 9 || { echo 'Another deployment is running.' >&2; exit 1; }
 compose=(docker compose --project-name sip-voice-home --file compose.yaml)
+if [[ -f compose.web.yaml ]]; then compose+=(--file compose.web.yaml); fi
 case "${1:-}" in
   status) "${compose[@]}" exec -T controller voice-home status; exit ;;
   check) "${compose[@]}" run --rm --no-deps controller validate

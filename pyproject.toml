@@ -19,5 +19,8 @@ voice-home = "voice_home.cli:main"
 [tool.setuptools.packages.find]
 where = ["src"]
 
+[tool.setuptools.package-data]
+voice_home = ["web_static/*"]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
