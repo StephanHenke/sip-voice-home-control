@@ -1,0 +1,2 @@
+// Optional: dediziertes Ereignis-Item, keine Geräteverknüpfung.
+String VoiceController_Notification "Controller-Benachrichtigung" { autoupdate="false" }

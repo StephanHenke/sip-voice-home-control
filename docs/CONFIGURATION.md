@@ -239,3 +239,11 @@ nie in Ausgaben aufgenommen.
 Die Statusdatei liegt fest unter `/tmp/voice-home/health.json`, unabhaengig von
 `data_dir`. `data_dir` bleibt fuer den Ansagencache. Alle neuen Steuerungs- und
 Logeinstellungen werden beim Prozessstart geladen; Aenderungen brauchen einen Neustart.
+
+### Aktionsbenachrichtigungen
+
+`smarthome.notification_item`: optionaler eigener String-Itemname, Standard leer
+(deaktiviert). `actions[].notification_text`: Standard leer, sonst Text mit optionalem
+`{name}`, maximal 500 Zeichen ohne Zeilenumbrüche. Meldungen werden ausschließlich
+bei bestätigtem Erfolg per Adapter veröffentlicht. Einrichtung und Grenzen:
+[openHAB Push](OPENHAB_NOTIFICATIONS.md).

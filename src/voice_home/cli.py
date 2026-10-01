@@ -55,7 +55,11 @@ def main():
             from .smarthome import create_adapter
             client = create_adapter(config)
             try:
-                print(json.dumps(client.check(config.actions, config.call_control)))
+                result = client.check(config.actions, config.call_control)
+                if config.smarthome.get('notification_item'):
+                    if client.read_item(config.smarthome['notification_item']).get('type') != 'String':
+                        raise ValueError('Benachrichtigungs-Item muss ein String sein')
+                print(json.dumps(result))
             finally:
                 client.close()
         elif args.command in {'health', 'status'}:

@@ -14,7 +14,7 @@ from .config import Config, credential
 from .dialog import Dialog
 from .limits import CallbackLimits
 from .actions import ActionExecutor
-from .smarthome import create_adapter, ControlBridge
+from .smarthome import create_adapter, ControlBridge, NotificationBridge
 from .runtime import write_status, operating_status
 from .routing import callback_uri, identify
 from .speech import Speech
@@ -224,6 +224,10 @@ class Engine:
         self.speech = None if probe else Speech(config.speech, config.data_dir / "prompts", self.dialog.prompts(), config.actions)
         self.adapter = None if probe else create_adapter(config)
         self.executor = None if probe else ActionExecutor(self.adapter)
+        self.notifier = None
+        if not probe and config.smarthome.get('notification_item'):
+            self.notifier = NotificationBridge(create_adapter(config), config.smarthome['notification_item'])
+            self.notifier.start()
         self.endpoint = pj.Endpoint()
         self.endpoint.libCreate()
         cfg = pj.EpConfig()
@@ -361,6 +365,8 @@ class Engine:
             except Exception:
                 result = "unconfirmed"
             log.info("action_result id=%s result=%s", action, result)
+            if self.notifier:
+                self.notifier.result(self.dialog.actions[action], call.caller, result)
             if call is self.current and not call.cancelled.is_set():
                 self.dispatch(call, self.dialog.result(call.session, action, result))
         call = self.current
@@ -486,6 +492,8 @@ class Engine:
             self.current = None
             self.account.shutdown()
             self.endpoint.libDestroy()
+            if self.notifier:
+                self.notifier.close()
             if self.adapter:
                 self.adapter.close()
             self.registered = False

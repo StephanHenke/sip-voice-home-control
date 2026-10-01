@@ -28,6 +28,7 @@ Bereits durchgeführte Prüfungen stehen in [VALIDATION.md](docs/VALIDATION.md).
 
 - [Betrieb, Anrufsteuerung, RAM-Status und Adapter](docs/OPERATIONS.md).
 - [openHAB-Anrufsteuerung einrichten und bedienen](docs/OPENHAB_CONTROL.md).
+- [Push-Benachrichtigungen mit Namen und Aktionen](docs/OPENHAB_NOTIFICATIONS.md).
 
 ## Funktionen
 

@@ -111,3 +111,46 @@ class ControlBridge:
         self.stop.set()
         self.wake.set()
         self.thread.join(timeout=1)
+
+
+class NotificationBridge:
+    """Best-effort action messages: bounded RAM queue, no replay or retries."""
+    def __init__(self, adapter, item):
+        self.adapter, self.item = adapter, item
+        self.events = queue.Queue(maxsize=32)
+        self.stop = threading.Event()
+        self.thread = threading.Thread(target=self._run, daemon=True)
+
+    def start(self):
+        self.thread.start()
+
+    def result(self, action, caller, result):
+        if result != 'ok' or not action.notification_text:
+            return
+        message = action.notification_text.replace('{name}', caller.name)
+        try:
+            self.events.put_nowait((time.monotonic(), message))
+        except queue.Full:
+            log.warning('notification_dropped reason=queue_full')
+
+    def _run(self):
+        try:
+            while not self.stop.is_set():
+                try:
+                    at, message = self.events.get(timeout=.1)
+                except queue.Empty:
+                    continue
+                if time.monotonic() - at > 30:
+                    log.warning('notification_dropped reason=expired')
+                    continue
+                try:
+                    self.adapter.send_command(self.item, message)
+                except Exception:
+                    # No retry: a timeout can mean the event was already delivered.
+                    log.warning('notification_dropped reason=adapter_error')
+        finally:
+            self.adapter.close()
+
+    def close(self):
+        self.stop.set()
+        self.thread.join(timeout=1)

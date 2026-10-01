@@ -60,6 +60,7 @@ class Action:
     failure_values: list[str] = field(default_factory=list)
     timeout_seconds: float = 10
     success_text: str = "OK."
+    notification_text: str = ""
     state_values: dict[str, list[str]] = field(default_factory=dict)
     success_states: list[str] = field(default_factory=list)
     failure_states: list[str] = field(default_factory=list)
@@ -81,6 +82,10 @@ class Action:
 
 
 def validate_feedback(action: Action):
+    text = action.notification_text
+    if not isinstance(text, str) or len(text) > 500 or any(c in text.replace('{name}', '') for c in '{}\r\n'):
+        raise ValueError('notification_text: maximal 500 Zeichen, nur Platzhalter {name}, keine Zeilenumbrüche')
+
     def values(value):
         return isinstance(value, list) and all(isinstance(v, str) and v.strip() for v in value)
 

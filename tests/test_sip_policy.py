@@ -32,6 +32,7 @@ def setup(monkeypatch, tmp_path):
     engine.probe = False
     engine.accepting = True
     engine.bridge = None
+    engine.notifier = None
     engine.current = engine.pending = engine.task = None
     engine.calls = {}
     engine.limits = CallbackLimits(60, 5)
@@ -305,3 +306,21 @@ def test_adapter_does_not_execute_a_prefix_at_maximum_utterance_duration(setup, 
     clock[0] = 116
     e.step()
     assert len(effects) == 1 and effects[0][0] == "say"
+
+
+def test_completed_action_reports_configured_caller_once_even_after_hangup(setup):
+    from concurrent.futures import Future
+    _, _, engine, _, _, _ = setup
+    engine.endpoint = types.SimpleNamespace(libHandleEvents=lambda _: None)
+    engine.events = queue.Queue()
+    received = []
+    engine.notifier = types.SimpleNamespace(result=lambda *args: received.append(args))
+    caller = engine.config.callers[0]
+    call = types.SimpleNamespace(caller=caller)
+    action = engine.config.actions[0]
+    future = Future()
+    future.set_result('ok')
+    engine.task = (future, call, action.id)
+    engine.step()
+    engine.step()
+    assert received == [(action, caller, 'ok')]

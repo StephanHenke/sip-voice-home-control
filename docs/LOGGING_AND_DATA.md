@@ -96,3 +96,11 @@ Der letzte Befehl ist nur fuer Docker-Konsolenlogging vorgesehen. Bei Treiber no
 stehen keine Docker-Ausgabelogs zur Verfuegung. Docker-eigene Verwaltungsdaten,
 Host-Logs und moegliches Swap sind keine Anwendungslogs; tmpfs allein garantiert
 keinen Ausschluss von Betriebssystem-Swap.
+
+### Optionale Push-Texte
+
+Mit `smarthome.notification_item` und `actions[].notification_text` wird bei
+bestätigtem Aktionserfolg ein Text einschließlich konfiguriertem Namen an openHAB
+übertragen. Controllerlogs enthalten diesen Text nicht. openHAB-Ereignislogs sowie Cloud-/Mobil-Push-Dienste
+können den Text jedoch speichern. Die Controllerwarteschlange ist ausschließlich
+im RAM. Details: [Push-Benachrichtigungen](OPENHAB_NOTIFICATIONS.md).

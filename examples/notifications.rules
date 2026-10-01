@@ -1,0 +1,9 @@
+rule "Voice controller confirmed action notification"
+when
+    Item VoiceController_Notification received command
+then
+    if (receivedCommand == NULL || receivedCommand == UNDEF) return;
+    val message = receivedCommand.toString
+    if (message.trim.length == 0) return;
+    sendBroadcastNotification(message)
+end

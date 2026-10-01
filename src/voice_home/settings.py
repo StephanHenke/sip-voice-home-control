@@ -35,9 +35,16 @@ def operational_settings(raw):
         items = [control.get(key) for key in ('switch_item', 'status_item', 'call_active_item', 'heartbeat_item')]
         if not all(isinstance(item, str) and re.fullmatch(r'[A-Za-z_][A-Za-z0-9_]*', item) for item in items) or len(set(items)) != 4:
             raise SettingsError('Vier unterschiedliche gültige Steuerungs-Items erforderlich')
-    smart = {'adapter': 'openhab', **raw.get('smarthome', {})}
+    smart = {'adapter': 'openhab', 'notification_item': '', **raw.get('smarthome', {})}
     if smart['adapter'] != 'openhab':
         raise SettingsError('Unbekannter Smart-Home-Adapter')
+    notification = smart['notification_item']
+    if not isinstance(notification, str) or (notification and not re.fullmatch(r'[A-Za-z_][A-Za-z0-9_]*', notification)):
+        raise SettingsError('smarthome.notification_item: gültiger Itemname erforderlich')
+    reserved = [control.get(k) for k in ('switch_item', 'status_item', 'call_active_item', 'heartbeat_item')]
+    reserved += [a.get(k) for a in raw.get('actions', []) for k in ('command_item', 'feedback_item')]
+    if notification and notification in reserved:
+        raise SettingsError('Benachrichtigungs-Item muss von Steuerungs- und Geräte-Items verschieden sein')
     logs = {'level': 'INFO', 'target': 'console', 'max_bytes': 10 * 1024 * 1024, 'backup_count': 2,
             'port': 514, 'transport': 'udp', 'facility': 'local0', 'queue_size': 1000, **raw.get('logging', {})}
     if logs['level'] not in {'OFF', 'ERROR', 'WARNING', 'INFO', 'DEBUG'} or logs['target'] not in {'none', 'console', 'file', 'syslog'}:
