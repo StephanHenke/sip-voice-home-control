@@ -20,13 +20,10 @@ Berechtigungen, Bestätigungen, Geräterückmeldungen und das Verhalten bei Ausf
 in der eigenen Installation geprüft werden. Vorhandene Schutzvorrichtungen dürfen
 nicht durch diese Anwendung ersetzt oder außer Kraft gesetzt werden.
 
-Die Software wird im vorhandenen Zustand bereitgestellt. Es wird keine Garantie
-für Fehlerfreiheit, Verfügbarkeit, Sicherheit oder Eignung für einen bestimmten
-Zweck übernommen. Soweit gesetzlich zulässig, übernehmen die Autoren und
-Mitwirkenden keine Haftung für Schäden aus Installation, Konfiguration oder
-Nutzung. Zwingende gesetzliche Haftung bleibt unberührt, insbesondere bei Vorsatz,
-grober Fahrlässigkeit und schuldhafter Verletzung von Leben, Körper oder Gesundheit.
-Dieser Hinweis ist keine Zusicherung eines vollständigen Haftungsausschlusses.
+**Die Software wird „wie sie ist“ (AS IS) in ihrem jeweils vorhandenen
+Entwicklungsstand bereitgestellt.** Ob sie für den vorgesehenen Einsatz geeignet
+ist und welche Anpassungen erforderlich sind, muss jede nutzende Person selbst
+prüfen und entscheiden.
 
 ## Entwicklungsstand
 
