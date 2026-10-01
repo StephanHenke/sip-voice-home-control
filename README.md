@@ -4,6 +4,32 @@ Lokale Sprachsteuerung für openHAB über Telefonanrufe an eine FRITZ!Box.
 Ein Linux-Docker-Container, CPU-Verarbeitung, kein LLM, keine Cloud-Sprachdienste.
 Ausgelegt für kurze deutsche Befehle, beispielsweise von einer Xplora-Uhr.
 
+## Nutzung auf eigene Gefahr und Verantwortung
+
+**Installation, Konfiguration und Nutzung erfolgen auf eigene Gefahr und in eigener
+Verantwortung.** Jede Person muss selbst abwägen und prüfen, ob, wie und unter
+welchen Sicherheitsvorkehrungen sie diese Anwendung in ihrer Umgebung einsetzt.
+Beispiele und vorgeschlagene Einstellungen ersetzen diese individuelle Prüfung nicht.
+
+Die Anwendung kann reale Geräte wie Haustüren und Garagentore steuern.
+Fehlkonfigurationen, Fehlinterpretationen, unbefugter Zugriff oder technische
+Störungen können unerwünschte Aktionen und Schäden verursachen. Betreiber sind
+für ihre Zugriffsfreigaben, Netzwerksicherheit, Geräteanbindung, Tests und den
+sicheren Betrieb verantwortlich. Vor einer Freigabe müssen insbesondere
+Berechtigungen, Bestätigungen, Geräterückmeldungen und das Verhalten bei Ausfällen
+in der eigenen Installation geprüft werden. Vorhandene Schutzvorrichtungen dürfen
+nicht durch diese Anwendung ersetzt oder außer Kraft gesetzt werden.
+
+Die Software wird im vorhandenen Zustand bereitgestellt. Es wird keine Garantie
+für Fehlerfreiheit, Verfügbarkeit, Sicherheit oder Eignung für einen bestimmten
+Zweck übernommen. Soweit gesetzlich zulässig, übernehmen die Autoren und
+Mitwirkenden keine Haftung für Schäden aus Installation, Konfiguration oder
+Nutzung. Zwingende gesetzliche Haftung bleibt unberührt, insbesondere bei Vorsatz,
+grober Fahrlässigkeit und schuldhafter Verletzung von Leben, Körper oder Gesundheit.
+Dieser Hinweis ist keine Zusicherung eines vollständigen Haftungsausschlusses.
+
+## Entwicklungsstand
+
 **Status:** Erste Implementierung. Automatisierte Kerntests sind vorhanden.
 Die reale SIP-/RTP-Verbindung, Verständlichkeit an der Uhr und physische
 Geräterückmeldungen müssen vor dem produktiven Einsatz abgenommen werden.
