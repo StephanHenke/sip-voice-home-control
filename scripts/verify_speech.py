@@ -5,6 +5,7 @@ from pathlib import Path
 import tempfile
 import time
 import wave
+from piper import PiperVoice, SynthesisConfig
 from voice_home.config import load
 from voice_home.intents import Intents
 from voice_home.speech import Speech
@@ -28,9 +29,15 @@ config = load(Path(__file__).parents[1] / 'config.example.yaml')
 parser = Intents(config.actions)
 failures = []
 with tempfile.TemporaryDirectory() as folder:
-    speech = Speech(config.speech, Path(folder), set(phrases), config.actions)
+    speech = Speech(config.speech, Path(folder), set(), config.actions)
+    # Piper defaults introduce random acoustic variation. Regression inputs must
+    # be reproducible; production prompt synthesis keeps its normal settings.
+    voice = PiperVoice.load(config.speech['tts_model'], use_cuda=False)
+    synthesis = SynthesisConfig(noise_scale=0.0, noise_w_scale=0.0)
     sources = []
     for phrase, expected in phrases.items():
+        with wave.open(str(speech.path(phrase)), 'wb') as output:
+            voice.synthesize_wav(phrase, output, syn_config=synthesis)
         with wave.open(str(speech.path(phrase)), 'rb') as wav:
             pcm, _ = audioop.ratecv(wav.readframes(wav.getnframes()), 2, 1, wav.getframerate(), 16000, None)
         sources.append((phrase, pcm + b'\x00' * 32000, expected))
