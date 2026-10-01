@@ -1,5 +1,7 @@
 # SIP Voice Home Control
 
+![Ein Kind öffnet die Haustür per Smartwatch-Anruf: Sprachbefehl, Bestätigungsfrage, Ja-Antwort und erfolgreiche Öffnung.](docs/assets/voice-home-header.png)
+
 Lokale Sprachsteuerung für openHAB über Telefonanrufe an eine FRITZ!Box.
 Ein Linux-Docker-Container, CPU-Verarbeitung, kein LLM, keine Cloud-Sprachdienste.
 Ausgelegt für kurze deutsche Befehle, beispielsweise von einer Xplora-Uhr.
