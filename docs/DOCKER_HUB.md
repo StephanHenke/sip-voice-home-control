@@ -19,18 +19,17 @@ Sprachbefehle lokal auf der CPU und führt konfigurierte Aktionen in openHAB aus
 Voraussetzungen: Proxmox auf amd64, Root-Konsole, DHCP, Internet für Installation
 und Image-Download sowie erreichbare SIP-/RTP- und openHAB-Verbindungen.
 
-1. [easy-start.sh](https://github.com/OWNER/sip-voice-home-control/blob/main/deploy/lxc/easy-start.sh)
-   herunterladen und auf den Proxmox-Host kopieren.
-2. Auf dem Host ausführen. Der Shell-Starter installiert fehlendes Python automatisch:
+Auf dem Host in der interaktiven Root-Konsole starten:
 
 ```bash
-bash easy-start.sh --image DOCKERHUB_NAMESPACE/sip-voice-home-control:latest
+wget -qO- https://raw.githubusercontent.com/OWNER/sip-voice-home-control/main/deploy/lxc/easy-start.sh | sh
 ```
 
-3. LXC-ID, Storage, Netzwerkbrücke und Debian-Vorlage auswählen.
-4. Ein eigenes Webpasswort vergeben. Danach richtet der Installer einen neuen
+1. Im Menü „Neuen LXC installieren“ wählen. LXC-ID, Storage, Netzwerkbrücke,
+   Debian-Vorlage und Image `DOCKERHUB_NAMESPACE/sip-voice-home-control:latest` auswählen.
+2. Ein eigenes Webpasswort vergeben. Danach richtet der Installer einen neuen
    unprivilegierten LXC mit Docker ein und startet das Image.
-5. Die ausgegebene HTTPS-Adresse öffnen, anmelden und SIP, openHAB, Anrufer und
+3. Die ausgegebene HTTPS-Adresse öffnen, anmelden und SIP, openHAB, Anrufer und
    Aktionen im YAML-Editor konfigurieren, validieren, speichern und neu laden.
 
 Der LXC erhält 2 CPUs, 3 GiB RAM und 12 GiB Disk. Das Webpasswort wird als
@@ -58,6 +57,14 @@ Schlüssel und ein per Konsole gesetztes Passwort.
 
 ## Aktualisieren
 
+Den Einzeiler erneut auf Proxmox oder im eingerichteten LXC starten und das
+Update-Menü wählen. Auf Proxmox werden laufende lokale Controller-LXC angeboten.
+Im LXC stehen zusätzlich **Webpasswort zurücksetzen** und **Einstellungen
+zurücksetzen** zur Verfügung. Ein Einstellungsreset erfordert `RESET`, sichert
+die bisherige YAML geschützt und sperrt Anrufe und Aktionen. Passwort, TLS und
+separate Secret-Dateien bleiben erhalten. Intern wird fehlendes Python bei
+Bedarf installiert; Eingaben erfolgen über `/dev/tty`.
+
 Bei einer Easy-Start-Installation zuerst die Anrufannahme deaktivieren und das
 Gesprächsende abwarten. Anschließend **im LXC**:
 
@@ -72,9 +79,9 @@ veröffentlichten Stand von `main`; für einen festen Stand einen vorhandenen
 
 ## Hinweise und Lizenz
 
-Beta: Die neue Easy-Start-Variante wurde automatisiert mit simulierten
-Proxmox-Aufrufen geprüft; eine vollständige reale Erstinstallation ist noch
-separat abzunehmen. Nutzung in eigener Verantwortung. Tür- und Toraktionen
+Easy Start wurde automatisiert und mit einer vollständigen Erstinstallation in
+einem separaten Proxmox-LXC geprüft. Die eigene Telefonie- und Geräteanbindung
+ist vor Ort abzunehmen. Nutzung in eigener Verantwortung. Tür- und Toraktionen
 erst nach eigenen Tests freigeben; die Verwaltungsoberfläche nur im vorgesehenen
 Verwaltungsnetz erreichbar machen.
 

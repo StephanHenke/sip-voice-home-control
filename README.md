@@ -115,16 +115,18 @@ ein eigenes Webpasswort ist vor LXC-Erstellung und Image-Pull Pflicht. Ohne
 Image-Tag wird `latest` geladen. Alle Vorlagen sind in einer Datei eingebettet;
 ein Checkout ist nicht erforderlich.
 
-`deploy/lxc/easy-start.sh` herunterladen und auf der Proxmox-Root-Konsole starten.
-Der Shell-Starter enthält den Installer und installiert fehlendes Python automatisch:
+Auf der Proxmox-Root-Konsole oder im eingerichteten LXC starten (`OWNER` ersetzen):
 
 ```bash
-bash easy-start.sh
+wget -qO- https://raw.githubusercontent.com/OWNER/sip-voice-home-control/main/deploy/lxc/easy-start.sh | sh
 ```
 
 Danach SIP, openHAB und Aktionen im Webeditor einrichten. Bis dahin bleiben
 Anrufe und Geräteaktionen gesperrt. Einzeldatei-Download, private Registries und
 Updates sind in der [Easy-Start-Anleitung](docs/EASY_START.md) beschrieben.
+Das Skript erkennt seine Umgebung: Auf Proxmox bietet es Installation, Update
+und Status; im LXC Update, Webpasswortreset und Einstellungsreset. Fehlendes
+Python wird automatisch installiert. Alle Eingaben laufen über die Konsole.
 
 ## Schnellstart auf Linux (amd64)
 

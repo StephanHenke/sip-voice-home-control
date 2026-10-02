@@ -4,7 +4,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 FILES = ['config.example.yaml', 'deploy/lxc/provision-lxc.sh',
          'deploy/lxc/compose.yaml', 'deploy/lxc/compose.web.yaml',
-         'deploy/lxc/voice-home-deploy.sh']
+         'deploy/lxc/voice-home-deploy.sh', 'scripts/easy_start_menu.py']
 
 
 def main():
@@ -26,7 +26,9 @@ def main():
     if marker in result.splitlines():
         raise ValueError('Reserved shell delimiter in installer')
     shell = header + f"\ncat >\"$installer\" <<'{marker}'\n" + result + f'\n{marker}\n'
-    shell += 'python3 "$installer" "$@"\n'
+    shell += 'python3 "$installer" "$@"\n}\n'
+    shell += '# Keep prompts separate from the downloaded script on stdin.\n'
+    shell += 'main "$@" </dev/tty\n'
     (ROOT / 'deploy/lxc/easy-start.sh').write_text(shell, encoding='utf-8', newline='\n')
 
 

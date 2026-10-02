@@ -1,13 +1,16 @@
-#!/usr/bin/env bash
+#!/bin/sh
 # Generated easy-start.sh embeds the Python installer below this header.
 set +x
-set -Eeuo pipefail
+set -eu
 umask 077
 
-if [[ "${1:-}" == --help || "${1:-}" == -h ]]; then
+if [ "${1:-}" = --help ] || [ "${1:-}" = -h ]; then
   cat <<'HELP'
-Usage: bash easy-start.sh [--image namespace/image:latest] [--repository OWNER/NAME]
-Run interactively as root on an amd64 Proxmox host.
+Usage: sh easy-start.sh [--image namespace/image:latest] [--repository OWNER/NAME]
+Update: sh easy-start.sh --update CTID [--image namespace/image:latest]
+Pipe mode: wget -qO- URL | sh -s -- [options]
+No options: environment-aware installation/maintenance menu.
+Run interactively as root on an amd64 Proxmox host or installed LXC.
 Installs missing Python 3 via APT, then runs the embedded guided installer.
 Requires a web password before creating the LXC. Existing containers are preserved.
 Additional arguments are forwarded to the embedded Python installer.
@@ -15,11 +18,20 @@ HELP
   exit 0
 fi
 
-[[ $EUID -eq 0 && -d /etc/pve ]] || { echo 'Als root auf dem Proxmox-Host ausführen.' >&2; exit 1; }
-[[ $(uname -m) == x86_64 && -t 0 && -t 1 ]] || { echo 'Interaktive amd64-Proxmox-Konsole erforderlich. Nicht in bash pipen.' >&2; exit 1; }
+main() {
+# The entire function (including the embedded payload) is parsed before execution.
+[ "$(id -u)" -eq 0 ] || { echo 'Root-Zugriff erforderlich.' >&2; exit 1; }
+[ "$(uname -m)" = x86_64 ] && [ -t 0 ] || { echo 'Interaktive amd64-Proxmox-Konsole erforderlich.' >&2; exit 1; }
+if [ -d /etc/pve ]; then
 for tool in pct pvesh pveam; do
   command -v "$tool" >/dev/null 2>&1 || { echo "Erforderliches Programm fehlt: $tool" >&2; exit 1; }
 done
+elif [ -f /opt/sip-voice-home/compose.yaml ] && [ -f /opt/sip-voice-home/voice-home-deploy.sh ]; then
+  command -v docker >/dev/null 2>&1 || { echo 'Docker fehlt.' >&2; exit 1; }
+else
+  echo 'Weder Proxmox-Host noch bestehende Controller-Installation erkannt.' >&2
+  exit 1
+fi
 
 ensure_python() {
   if ! command -v python3 >/dev/null 2>&1; then
@@ -31,7 +43,7 @@ ensure_python() {
 ensure_python
 
 installer=$(mktemp /tmp/voice-home-installer.XXXXXXXX.py)
-trap 'rm -f -- "$installer"' EXIT
+trap 'rm -f -- "$installer"' 0
 trap 'exit 130' INT
 trap 'exit 143' TERM
 
@@ -256,10 +268,12 @@ digest = hashlib.scrypt(password.encode(), salt=bytes.fromhex(salt), n=16384, r=
 print(json.dumps({'salt': salt, 'hash': digest}))
 PASSWORD
 )
-pct create "$ctid" "$template" --hostname sip-voice-home --unprivileged 1 \
+# Proxmox's unprivileged extractor must traverse the root-owned mount directories.
+# Keep the private default for password/config files, but use normal PVE directory modes.
+(umask 022; pct create "$ctid" "$template" --hostname sip-voice-home --unprivileged 1 \
   --features nesting=1,keyctl=1 --cores 2 --memory 3072 --swap 0 \
   --rootfs "$storage:12" --net0 "name=eth0,bridge=$bridge,ip=dhcp,type=veth" \
-  --onboot 1 --tags sip-controller
+  --onboot 1 --tags sip-controller)
 pct start "$ctid"
 pct exec "$ctid" -- bash -s <<'INSTALL'
 set -Eeuo pipefail
@@ -415,6 +429,191 @@ else
   exit 1
 fi
 ''',
+    'scripts/easy_start_menu.py': r'''"""Environment-aware maintenance, embedded into the standalone installer."""
+import json
+import os
+from pathlib import Path
+import shutil
+import socket
+import time
+import uuid
+
+APP = Path('/opt/sip-voice-home')
+
+
+def environment():
+    if Path('/etc/pve').is_dir():
+        return 'host'
+    if (APP / 'compose.yaml').is_file() and (APP / 'voice-home-deploy.sh').is_file() and shutil.which('docker'):
+        return 'lxc'
+    raise ValueError('Weder Proxmox-Host noch bestehende Controller-Installation erkannt.')
+
+
+def compose(*args):
+    command = ['docker', 'compose', '--project-directory', str(APP), '--project-name', 'sip-voice-home',
+               '-f', str(APP / 'compose.yaml')]
+    if (APP / 'compose.web.yaml').is_file():
+        command += ['-f', str(APP / 'compose.web.yaml')]
+    return command + list(args)
+
+
+def require_idle(run):
+    state = json.loads(run(*compose('exec', '-T', 'controller', 'voice-home', 'status'), capture=True))
+    if not state.get('fresh') or state.get('busy') or state.get('call_active') or state.get('accepting') is not False:
+        raise ValueError('Annahme ausschalten und Gesprächsende abwarten; aktueller freier Status erforderlich.')
+
+
+def check_web(run):
+    # Check the local listener; SIP is deliberately unconfigured after reset.
+    probe = "import os,socket; socket.create_connection(('127.0.0.1',int(os.getenv('VOICE_HOME_WEB_PORT','8443'))),2).close()"
+    for _ in range(30):
+        try:
+            run(*compose('exec', '-T', 'controller', 'python', '-c', probe), capture=True)
+            return
+        except RuntimeError:
+            time.sleep(1)
+    raise RuntimeError('Weboberfläche nach Neustart nicht erreichbar.')
+
+
+def reset_config(api):
+    import fcntl
+    if not (APP / 'compose.web.yaml').is_file():
+        raise ValueError('Einstellungsreset benötigt die konfigurierte Weboberfläche.')
+    with open('/run/lock/voice-home-deploy.lock', 'w') as lock:
+        try:
+            fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError:
+            raise ValueError('Eine andere Wartung läuft bereits.') from None
+        require_idle(api.run)
+        if api.ask('YAML sichern und Einstellungen zurücksetzen? RESET eingeben') != 'RESET':
+            print('Abgebrochen.')
+            return
+        require_idle(api.run)
+        config = APP / 'config/config.yaml'
+        if config.is_symlink() or not config.is_file():
+            raise ValueError('Reguläre config/config.yaml erforderlich.')
+        old = config.read_bytes()
+        previous = config.stat()
+        backups = APP / 'backups'
+        if backups.is_symlink():
+            raise ValueError('Backup-Verzeichnis darf kein Symlink sein.')
+        backups.mkdir(mode=0o700, exist_ok=True)
+        backups.chmod(0o700)
+        backup = backups / ('config-reset-' + uuid.uuid4().hex + '.yaml')
+        with open(backup, 'xb') as file:
+            os.chmod(backup, 0o600)
+            file.write(old)
+            file.flush()
+            os.fsync(file.fileno())
+        replacement = api.initial_config(api.example).encode('utf-8')
+        temporary = config.with_name('.reset-' + uuid.uuid4().hex)
+        def write_config(content, uid, gid, mode):
+            with open(temporary, 'xb') as file:
+                os.fchmod(file.fileno(), mode)
+                os.fchown(file.fileno(), uid, gid)
+                file.write(content)
+                file.flush()
+                os.fsync(file.fileno())
+            os.replace(temporary, config)
+        api.run(*compose('stop', '-t', '30', 'controller'))
+        try:
+            write_config(replacement, 10001, 10001, 0o600)
+            api.run(*compose('up', '-d', '--no-build', 'controller'))
+            check_web(api.run)
+        except Exception:
+            temporary.unlink(missing_ok=True)
+            api.run(*compose('stop', '-t', '30', 'controller'))
+            write_config(old, previous.st_uid, previous.st_gid, previous.st_mode & 0o777)
+            api.run(*compose('up', '-d', '--no-build', 'controller'))
+            raise RuntimeError('Reset fehlgeschlagen; vorherige YAML wiederhergestellt. Betrieb prüfen.') from None
+        finally:
+            temporary.unlink(missing_ok=True)
+        print(f'Einstellungen zurückgesetzt. Geschützte YAML-Sicherung: {backup}')
+        print('Annahme und Aktionen gesperrt. Webpasswort, TLS und Secret-Dateien bleiben erhalten.')
+        print('SIP bleibt bis zur Einrichtung ungesund; im Webeditor neu konfigurieren.')
+
+
+def targets(api):
+    records = json.loads(api.run('pvesh', 'get', '/cluster/resources', '--type', 'vm', '--output-format', 'json', capture=True))
+    node = socket.gethostname().split('.')[0]
+    result = []
+    for record in records:
+        if record.get('type') != 'lxc' or record.get('status') != 'running' or record.get('node') != node:
+            continue
+        ctid = str(record['vmid'])
+        try:
+            api.run('pct', 'exec', ctid, '--', 'test', '-x', str(APP / 'voice-home-deploy.sh'), capture=True)
+        except RuntimeError:
+            continue
+        result.append(ctid)
+    return result
+
+
+def update(api, prefix, image):
+    image = api.image_reference(image or api.ask('Ziel-Image (ohne Tag: latest)'))
+    state = json.loads(api.run(*prefix, str(APP / 'voice-home-deploy.sh'), 'status', capture=True))
+    if not state.get('fresh') or state.get('busy') or state.get('call_active') or state.get('accepting') is not False:
+        raise ValueError('Update abgelehnt: Annahme ausschalten, Gesprächsende und aktuellen Status abwarten.')
+    cid = api.run(*prefix, *compose('ps', '-q', 'controller'), capture=True)
+    if cid:
+        print('Aktuelles Image: ' + api.run(*prefix, 'docker', 'inspect', cid, '--format', '{{.Image}}', capture=True))
+    print('Ziel: ' + image)
+    if api.ask('Update starten? UPDATE eingeben') != 'UPDATE':
+        print('Abgebrochen.')
+        return
+    api.run(*prefix, str(APP / 'voice-home-deploy.sh'), 'update', image)
+
+
+def dispatch(args, api):
+    place = environment()
+    direct = 'update' if args.update is not None else 'status' if args.status is not None else None
+    while True:
+        if direct:
+            action = direct
+        else:
+            print('\n1) ' + ('Neuen LXC installieren' if place == 'host' else 'Controller aktualisieren'))
+            print('2) ' + ('Installation aktualisieren' if place == 'host' else 'Webpasswort zurücksetzen'))
+            print('3) ' + ('Status anzeigen' if place == 'host' else 'Einstellungen zurücksetzen'))
+            print('0) Beenden')
+            choice = api.ask('Auswahl', '0')
+            if choice == '0':
+                return
+            actions = {'1': 'install', '2': 'update', '3': 'status'} if place == 'host' else {'1': 'update', '2': 'password', '3': 'reset'}
+            action = actions.get(choice)
+            if action is None:
+                print('Ungültige Auswahl.')
+                continue
+        try:
+            if action == 'install':
+                api.install()
+            else:
+                prefix = []
+                if place == 'host':
+                    supplied = args.update if action == 'update' else args.status
+                    choices = targets(api)
+                    ctid = supplied or api.select('Laufende lokale Controller-LXC', choices)
+                    if ctid not in choices:
+                        raise ValueError('Kein laufender lokaler Controller-LXC mit dieser ID gefunden.')
+                    prefix = ['pct', 'exec', ctid, '--']
+                elif args.update or args.status:
+                    raise ValueError('Im LXC keine fremde LXC-ID angeben.')
+                if action == 'status':
+                    api.run(*prefix, str(APP / 'voice-home-deploy.sh'), 'status')
+                elif action == 'update':
+                    update(api, prefix, args.image)
+                elif action == 'password':
+                    if not (APP / 'compose.web.yaml').is_file():
+                        raise ValueError('Weboberfläche ist nicht eingerichtet.')
+                    api.run(*compose('run', '--rm', '--no-deps', 'controller', 'web-password'))
+                elif action == 'reset':
+                    reset_config(api)
+        except (RuntimeError, ValueError) as error:
+            if direct:
+                raise
+            print(str(error))
+        if direct:
+            return
+''',
 }
 # END BUNDLED FILES
 APP = '/opt/sip-voice-home'
@@ -563,16 +762,35 @@ sys.exit('Weboberfläche nicht bereit; Containerzustand prüfen.')
     print('Updates im LXC: cd ' + APP + ' && ./voice-home-deploy.sh update ' + image)
 
 
-def main():
+def main(argv=None):
     parser = argparse.ArgumentParser(description='Geführte Erstinstallation auf einem Proxmox-Host')
     parser.add_argument('--repository', help='Optional: OWNER/NAME bestimmt nur den GHCR-Image-Namen')
     parser.add_argument('--image', help='Registry-Image; ohne Tag wird latest verwendet')
     parser.add_argument('--source-dir', type=Path, help='Optional: lokale Vorlagen statt der eingebetteten Dateien')
-    args = parser.parse_args()
-    if platform.system() != 'Linux' or os.geteuid() != 0 or not Path('/etc/pve').is_dir():
+    modes = parser.add_mutually_exclusive_group()
+    modes.add_argument('--install', action='store_true', help='Direkt zur Neuinstallation auf Proxmox')
+    modes.add_argument('--menu', action='store_true', help='Umgebungsabhängiges Menü')
+    modes.add_argument('--update', nargs='?', const='', help='Update im LXC oder mit CTID auf Proxmox')
+    modes.add_argument('--status', nargs='?', const='', help='Status im LXC oder mit CTID auf Proxmox')
+    args = parser.parse_args(argv)
+    if platform.system() != 'Linux' or os.geteuid() != 0:
         raise RuntimeError('Als root direkt auf dem Proxmox-Host ausführen.')
     if platform.machine() != 'x86_64' or not sys.stdin.isatty():
         raise RuntimeError('Interaktive amd64-Proxmox-Konsole erforderlich.')
+    if not args.install and (args.menu or args.update is not None or args.status is not None or not (argv if argv is not None else sys.argv[1:]) or not Path('/etc/pve').is_dir()):
+        from types import SimpleNamespace
+        namespace = {}
+        exec(compile(BUNDLED_FILES['scripts/easy_start_menu.py'], 'easy_start_menu.py', 'exec'), namespace)
+        install_args = ['--install']
+        for flag, value in (('--image', args.image), ('--repository', args.repository), ('--source-dir', args.source_dir)):
+            if value:
+                install_args.extend([flag, str(value)])
+        api = SimpleNamespace(run=run, ask=ask, select=select, image_reference=image_reference,
+                              initial_config=initial_config, example=BUNDLED_FILES['config.example.yaml'],
+                              install=lambda: main(install_args))
+        return namespace['dispatch'](args, api)
+    if not Path('/etc/pve').is_dir():
+        raise RuntimeError('Neuinstallation nur auf einem Proxmox-Host möglich.')
     for tool in ('pct', 'pvesh', 'pveam', 'bash', 'python3'):
         if not shutil.which(tool):
             raise RuntimeError('Erforderliches Programm fehlt: ' + tool)
@@ -626,3 +844,6 @@ if __name__ == '__main__':
 
 VOICE_HOME_EMBEDDED_PYTHON
 python3 "$installer" "$@"
+}
+# Keep prompts separate from the downloaded script on stdin.
+main "$@" </dev/tty

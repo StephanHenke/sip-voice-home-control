@@ -7,6 +7,44 @@ installiert; zusätzliche Python-Pakete sind nicht nötig. Unterstützt wird amd
 mit einer Debian-12- oder Debian-13-Vorlage.
 Der Installer nutzt die Proxmox-Werkzeuge `pvesh`, `pveam` und `pct`.
 
+## Einzeiler und Menüs
+
+In der interaktiven Root-Konsole des Proxmox-Hosts oder des eingerichteten LXC
+ausführen (`OWNER` ersetzen, `wget` muss installiert sein):
+
+```sh
+wget -qO- https://raw.githubusercontent.com/OWNER/sip-voice-home-control/main/deploy/lxc/easy-start.sh | sh
+```
+
+Die komplette Einrichtung ist enthalten. Eingaben und Passwörter werden von
+`/dev/tty` gelesen, getrennt vom heruntergeladenen Skript. Ohne Terminal ist
+kein Betrieb möglich. Der vollständige Funktionsblock muss geladen sein, bevor
+die Einrichtung beginnt. Quelle vor Ausführung als root prüfen.
+
+Auf Proxmox erscheint:
+
+```text
+1) Neuen LXC installieren
+2) Installation aktualisieren
+3) Status anzeigen
+0) Beenden
+```
+
+Im eingerichteten LXC erscheint:
+
+```text
+1) Controller aktualisieren
+2) Webpasswort zurücksetzen
+3) Einstellungen zurücksetzen
+0) Beenden
+```
+
+Gemeint ist die LXC-Konsole, nicht der Docker-Anwendungscontainer. Die Installation
+wird über `/opt/sip-voice-home/compose.yaml`, das Bereitstellungsskript und Docker
+erkannt. Unbekannte Umgebungen werden vor einer Paketinstallation abgelehnt.
+Auf Proxmox werden nur laufende Controller-LXC des aktuellen Knotens angeboten;
+gestoppte Container zuerst bewusst starten, für andere Knoten dort anmelden.
+
 ## Einzeldatei starten
 
 `deploy/lxc/easy-start.sh` herunterladen und auf den Proxmox-Host kopieren.
@@ -20,11 +58,11 @@ Auf der interaktiven Proxmox-Root-Konsole starten:
 bash easy-start.sh
 ```
 
-Das gewünschte Container-Image wird abgefragt. Ohne Tag wird automatisch `latest`
-verwendet. Alternativ direkt angeben (`OWNER` in Kleinschreibung ersetzen):
+Ohne Argumente öffnet sich das Menü. Bei der Installation wird das Container-Image
+abgefragt; ohne Tag wird `latest` verwendet. Direkt installieren:
 
 ```bash
-bash easy-start.sh --image ghcr.io/OWNER/sip-voice-home-control:latest
+sh easy-start.sh --install --image ghcr.io/OWNER/sip-voice-home-control:latest
 ```
 
 Explizite Tags und Digests bleiben erhalten. Für reproduzierbare Installationen
@@ -55,8 +93,8 @@ und auf den Host kopieren. Tokens nicht in URLs, Befehlszeilen oder Shell-Histor
 eintragen. Der Installer gehört zu diesem Projekt und ist keine Veröffentlichung
 des Community-Helper-Scripts-Projekts.
 
-Nicht mit `curl ... | bash` starten: Auswahl und Passwortabfrage benötigen eine
-interaktive Konsole. Der Shell-Starter prüft Root-Zugriff, Proxmox-Werkzeuge und
+Pipe-Aufrufe sind unterstützt, benötigen aber eine interaktive Root-Konsole.
+Der Shell-Starter prüft Root-Zugriff, Proxmox-Werkzeuge und
 Architektur vor der Python-Installation. Bei APT-Fehlern bricht er ab; bestehende
 Paketquellen bleiben unverändert. Der temporär entpackte Python-Installer wird
 nach Programmende entfernt. `bash easy-start.sh --help` zeigt die Hilfe ohne
@@ -116,7 +154,49 @@ cd /opt/sip-voice-home
 
 Annahme vorher ausschalten und Gesprächsende abwarten. Das vorhandene
 [Update-Skript](LXC.md) erhält Konfiguration, Webpasswort und Daten.
-Der Easy-Start-Assistent selbst dient ausschließlich der Erstinstallation.
+Alternativ den Einzeiler erneut starten und das Update-Menü wählen. Auf dem
+Host eine lokale LXC-ID auswählen, im LXC wird die dortige Installation verwendet.
+Das Ziel-Image wird abgefragt, die aktuelle Image-ID angezeigt und vor dem Update
+`UPDATE` verlangt. Ohne Tag wird `latest` verwendet. Direkter Aufruf:
+
+```sh
+# Proxmox-Host, Beispiel-ID ersetzen:
+sh easy-start.sh --update 200 --image ghcr.io/OWNER/sip-voice-home-control:latest
+# Im LXC:
+sh easy-start.sh --update --image ghcr.io/OWNER/sip-voice-home-control:latest
+```
+
+Bei Pipe-Aufrufen Optionen mit `| sh -s -- --update ...` übergeben.
+Aktualisiert wird der Controller, nicht Proxmox, Debian oder Docker. Ein fehlender
+oder veralteter Status, ein Gespräch oder aktivierte Annahme blockieren das Update.
+Das vorhandene Update-Skript prüft Konfiguration und Geräteanbindung ohne
+Gerätebefehle. Bei fehlgeschlagener Betriebsprüfung wird das vorherige Image
+wieder gestartet; ein fehlgeschlagener Rollback wird als Fehler gemeldet.
+Updates benötigen eine vollständig eingerichtete, prüfbare Installation.
+
+## Passwort und Einstellungen zurücksetzen
+
+Nur das LXC-Menü bietet die beiden Reset-Funktionen an. Beim Passwortreset wird
+das neue Webpasswort zweimal verdeckt abgefragt und als scrypt-Hash gespeichert.
+Bestehende Web-Sitzungen werden ungültig; Konfiguration und TLS bleiben erhalten.
+
+Der Einstellungsreset benötigt eine vorhandene Weboberfläche, einen aktuellen
+freien Betriebsstatus und ausgeschaltete Annahme. `RESET` muss ausdrücklich
+eingegeben werden. Vor Änderungen wird die YAML unter
+`/opt/sip-voice-home/backups/config-reset-<Zufalls-ID>.yaml` gesichert (Verzeichnis
+0700, Datei 0600, root). Die Sicherung kann Zugangsdaten enthalten und wird nicht
+automatisch gelöscht. Sie ist kein Download in der Weboberfläche.
+
+Anschließend wird der Controller gestoppt, die YAML atomar durch die gesperrte
+Startkonfiguration ersetzt und der Controller wieder gestartet. Bei einem
+erkannten Startfehler wird die vorherige YAML wiederhergestellt. Die Prüfung
+nach dem Reset kontrolliert den lokalen Webport, nicht eine SIP-Anmeldung.
+Das Webpasswort, TLS, separate Secrets, Ansagencache und bestehende YAML-Versionen
+bleiben erhalten. Dies ist keine Datenlöschung. SIP bleibt bis zur erneuten
+Einrichtung ungesund; Anrufer und Geräteaktionen sind nicht freigegeben.
+
+Reset und Deployment verwenden dieselbe Wartungssperre. Während der Wartung
+keine parallelen Änderungen im Webeditor oder über openHAB vornehmen.
 
 Bei Abbruch wird ein bereits angelegter LXC nicht automatisch gelöscht. Die
 ausgegebene ID auf dem Host prüfen; bestehende Container werden nicht überschrieben.
@@ -126,7 +206,15 @@ Verwaltungsnetz erreichbar machen. Das Skript ändert keine Router-Firewallregel
 
 Automatisierte Tests prüfen die Auswahlgrenzen, den Passwortablauf, die gesperrte
 Startkonfiguration und Befehlsübergabe mit ersetzten Infrastrukturaufrufen.
-Eine vollständige Neuanlage auf einem realen Proxmox-Host ist separat abzunehmen.
+Zusätzlich wurde die vollständige Neuanlage per Shell-Pipe in einem separaten
+unprivilegierten LXC auf Proxmox geprüft, einschließlich Docker-Installation,
+Image-Download und HTTPS-Erreichbarkeit. SIP und openHAB wurden für die
+Wartungstests durch lokale Testgegenstellen ersetzt; reale Geräte wurden nicht
+angesteuert. Geprüft wurden auch Passwortreset, Image-Update mit Erhalt von YAML,
+Passwort und TLS, Rückkehr zum vorherigen Image bei einem absichtlich defekten
+Kandidaten sowie Einstellungsreset mit geschützter Sicherung und gesperrter
+Startkonfiguration. Die eigene Netzwerk- und Telefonieanbindung bleibt vor Ort
+zu prüfen.
 
 Referenz: [Proxmox-Containerdokumentation](https://pve.proxmox.com/pve-docs/chapter-pct.html).
 

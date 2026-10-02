@@ -34,10 +34,12 @@ digest = hashlib.scrypt(password.encode(), salt=bytes.fromhex(salt), n=16384, r=
 print(json.dumps({'salt': salt, 'hash': digest}))
 PASSWORD
 )
-pct create "$ctid" "$template" --hostname sip-voice-home --unprivileged 1 \
+# Proxmox's unprivileged extractor must traverse the root-owned mount directories.
+# Keep the private default for password/config files, but use normal PVE directory modes.
+(umask 022; pct create "$ctid" "$template" --hostname sip-voice-home --unprivileged 1 \
   --features nesting=1,keyctl=1 --cores 2 --memory 3072 --swap 0 \
   --rootfs "$storage:12" --net0 "name=eth0,bridge=$bridge,ip=dhcp,type=veth" \
-  --onboot 1 --tags sip-controller
+  --onboot 1 --tags sip-controller)
 pct start "$ctid"
 pct exec "$ctid" -- bash -s <<'INSTALL'
 set -Eeuo pipefail
