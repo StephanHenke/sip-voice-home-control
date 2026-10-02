@@ -38,6 +38,13 @@ def test_bundle_matches_reviewed_sources():
         assert content == (ROOT / name).read_text(encoding='utf-8'), 'Run scripts/bundle_installer.py'
 
 
+def test_shell_installer_embeds_current_python_and_header():
+    shell = (ROOT / 'deploy/lxc/easy-start.sh').read_text(encoding='utf-8')
+    assert shell.startswith((ROOT / 'scripts/easy-start-header.sh').read_text(encoding='utf-8'))
+    embedded = shell.split("<<'VOICE_HOME_EMBEDDED_PYTHON'\n", 1)[1].split('\nVOICE_HOME_EMBEDDED_PYTHON\n', 1)[0]
+    assert embedded == (ROOT / 'deploy/lxc/easy-start.py').read_text(encoding='utf-8')
+
+
 @pytest.mark.parametrize('value,expected', [
     ('ghcr.io/example/project', 'ghcr.io/example/project:latest'),
     ('registry.example:5000/project', 'registry.example:5000/project:latest'),

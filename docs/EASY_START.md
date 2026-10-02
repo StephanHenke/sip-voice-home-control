@@ -1,36 +1,30 @@
 # Easy Start auf Proxmox
 
-`deploy/lxc/easy-start.py` ist ein geführter Installer für die **Root-Konsole des
-Proxmox-Hosts**. Er benötigt Python 3 auf dem Host, aber keine zusätzlichen
-Python-Pakete. Python wird nicht als bereits installiert vorausgesetzt. Unterstützt wird amd64 mit einer Debian-12- oder Debian-13-Vorlage.
+`deploy/lxc/easy-start.sh` ist ein geführter Shell-Starter für die **Root-Konsole des
+Proxmox-Hosts**. Er enthält den Python-Installer und alle Vorlagen in einer Datei.
+Python 3 wird intern weiterhin verwendet und bei Bedarf automatisch über APT
+installiert; zusätzliche Python-Pakete sind nicht nötig. Unterstützt wird amd64
+mit einer Debian-12- oder Debian-13-Vorlage.
 Der Installer nutzt die Proxmox-Werkzeuge `pvesh`, `pveam` und `pct`.
 
 ## Einzeldatei starten
 
-`deploy/lxc/easy-start.py` herunterladen und auf den Proxmox-Host kopieren.
+`deploy/lxc/easy-start.sh` herunterladen und auf den Proxmox-Host kopieren.
 Der Installer enthält alle benötigten Vorlagen bereits: LXC-Einrichtung,
 Compose-Dateien, Startkonfiguration und Update-Skript. Ein Repository-Checkout
 oder das Nachladen weiterer Quelldateien über die GitHub-API ist nicht nötig.
 
-Auf der Proxmox-Root-Konsole starten. Falls Python 3 fehlt, installiert dieser
-Startblock es über die vorhandenen APT-Paketquellen; bei einem Fehler bricht er ab:
+Auf der interaktiven Proxmox-Root-Konsole starten:
 
 ```bash
-(
-  set -e
-  if ! command -v python3 >/dev/null 2>&1; then
-    apt-get update
-    apt-get install -y python3
-  fi
-  python3 easy-start.py
-)
+bash easy-start.sh
 ```
 
 Das gewünschte Container-Image wird abgefragt. Ohne Tag wird automatisch `latest`
 verwendet. Alternativ direkt angeben (`OWNER` in Kleinschreibung ersetzen):
 
 ```bash
-python3 easy-start.py --image ghcr.io/OWNER/sip-voice-home-control:latest
+bash easy-start.sh --image ghcr.io/OWNER/sip-voice-home-control:latest
 ```
 
 Explizite Tags und Digests bleiben erhalten. Für reproduzierbare Installationen
@@ -44,14 +38,14 @@ möglich. Er führt heruntergeladenen Code als root aus; Quelle zuvor prüfen:
 ```bash
 (
   set -e
-  if ! command -v python3 >/dev/null 2>&1 || ! command -v curl >/dev/null 2>&1; then
+  if ! command -v curl >/dev/null 2>&1; then
     apt-get update
-    apt-get install -y python3 curl ca-certificates
+    apt-get install -y curl ca-certificates
   fi
   installer="$(mktemp)"
   trap 'rm -f "$installer"' EXIT
-  curl -fsSL https://raw.githubusercontent.com/OWNER/sip-voice-home-control/main/deploy/lxc/easy-start.py -o "$installer"
-  python3 "$installer" --repository OWNER/sip-voice-home-control
+  curl -fsSL https://raw.githubusercontent.com/OWNER/sip-voice-home-control/main/deploy/lxc/easy-start.sh -o "$installer"
+  bash "$installer" --repository OWNER/sip-voice-home-control
 )
 ```
 
@@ -60,6 +54,13 @@ In diesem Fall die Einzeldatei über die angemeldete GitHub-Oberfläche herunter
 und auf den Host kopieren. Tokens nicht in URLs, Befehlszeilen oder Shell-History
 eintragen. Der Installer gehört zu diesem Projekt und ist keine Veröffentlichung
 des Community-Helper-Scripts-Projekts.
+
+Nicht mit `curl ... | bash` starten: Auswahl und Passwortabfrage benötigen eine
+interaktive Konsole. Der Shell-Starter prüft Root-Zugriff, Proxmox-Werkzeuge und
+Architektur vor der Python-Installation. Bei APT-Fehlern bricht er ab; bestehende
+Paketquellen bleiben unverändert. Der temporär entpackte Python-Installer wird
+nach Programmende entfernt. `bash easy-start.sh --help` zeigt die Hilfe ohne
+Installation. Der direkte Aufruf von `easy-start.py` bleibt ebenfalls möglich.
 
 ## Geführter Ablauf
 

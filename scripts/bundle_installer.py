@@ -19,8 +19,15 @@ def main():
             raise ValueError('Embedded file contains reserved triple quote: ' + name)
         entries.append(f"    {name!r}: r'''{content}''',\n")
     bundle = 'BUNDLED_FILES = {\n' + ''.join(entries) + '}\n'
-    path.write_text(before + '# BEGIN BUNDLED FILES\n' + bundle + '# END BUNDLED FILES\n' + after,
-                    encoding='utf-8', newline='\n')
+    result = before + '# BEGIN BUNDLED FILES\n' + bundle + '# END BUNDLED FILES\n' + after
+    path.write_text(result, encoding='utf-8', newline='\n')
+    header = (ROOT / 'scripts/easy-start-header.sh').read_text(encoding='utf-8')
+    marker = 'VOICE_HOME_EMBEDDED_PYTHON'
+    if marker in result.splitlines():
+        raise ValueError('Reserved shell delimiter in installer')
+    shell = header + f"\ncat >\"$installer\" <<'{marker}'\n" + result + f'\n{marker}\n'
+    shell += 'python3 "$installer" "$@"\n'
+    (ROOT / 'deploy/lxc/easy-start.sh').write_text(shell, encoding='utf-8', newline='\n')
 
 
 if __name__ == '__main__':

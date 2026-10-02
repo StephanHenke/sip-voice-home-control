@@ -19,19 +19,12 @@ Sprachbefehle lokal auf der CPU und führt konfigurierte Aktionen in openHAB aus
 Voraussetzungen: Proxmox auf amd64, Root-Konsole, DHCP, Internet für Installation
 und Image-Download sowie erreichbare SIP-/RTP- und openHAB-Verbindungen.
 
-1. [easy-start.py](https://github.com/OWNER/sip-voice-home-control/blob/main/deploy/lxc/easy-start.py)
+1. [easy-start.sh](https://github.com/OWNER/sip-voice-home-control/blob/main/deploy/lxc/easy-start.sh)
    herunterladen und auf den Proxmox-Host kopieren.
-2. Auf dem Host ausführen:
+2. Auf dem Host ausführen. Der Shell-Starter installiert fehlendes Python automatisch:
 
 ```bash
-(
-  set -e
-  if ! command -v python3 >/dev/null 2>&1; then
-    apt-get update
-    apt-get install -y python3
-  fi
-  python3 easy-start.py --image DOCKERHUB_NAMESPACE/sip-voice-home-control:latest
-)
+bash easy-start.sh --image DOCKERHUB_NAMESPACE/sip-voice-home-control:latest
 ```
 
 3. LXC-ID, Storage, Netzwerkbrücke und Debian-Vorlage auswählen.

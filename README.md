@@ -115,17 +115,11 @@ ein eigenes Webpasswort ist vor LXC-Erstellung und Image-Pull Pflicht. Ohne
 Image-Tag wird `latest` geladen. Alle Vorlagen sind in einer Datei eingebettet;
 ein Checkout ist nicht erforderlich.
 
-`deploy/lxc/easy-start.py` herunterladen und auf der Proxmox-Root-Konsole starten:
+`deploy/lxc/easy-start.sh` herunterladen und auf der Proxmox-Root-Konsole starten.
+Der Shell-Starter enthält den Installer und installiert fehlendes Python automatisch:
 
 ```bash
-(
-  set -e
-  if ! command -v python3 >/dev/null 2>&1; then
-    apt-get update
-    apt-get install -y python3
-  fi
-  python3 easy-start.py
-)
+bash easy-start.sh
 ```
 
 Danach SIP, openHAB und Aktionen im Webeditor einrichten. Bis dahin bleiben
