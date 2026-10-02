@@ -80,6 +80,12 @@ Ein solches Update während eines Telefongesprächs wird damit vermieden.
 
 ## Voraussetzungen
 
+Die Vorlage für die Docker-Hub-Übersicht liegt in [DOCKER_HUB.md](DOCKER_HUB.md).
+Vor dem Einfügen in Docker Hub `OWNER` durch den GitHub-Eigentümer und
+`DOCKERHUB_NAMESPACE` durch den Docker-Hub-Namespace ersetzen. Das Headerbild
+benötigt einen öffentlich erreichbaren GitHub-Raw-Link. Die Übersicht wird
+derzeit manuell in Docker Hub gepflegt; Image-Pushes aktualisieren sie nicht.
+
 GitHub Actions und die erforderlichen Registry-Berechtigungen müssen aktiviert sein.
 Bei ausgeschöpftem Actions-Kontingent muss zunächst wieder Kapazität verfügbar sein.
 Ein fehlgeschlagener Lauf kann anschließend manuell neu gestartet werden.
