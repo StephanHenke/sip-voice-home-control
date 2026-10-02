@@ -24,7 +24,14 @@ und Image-Download sowie erreichbare SIP-/RTP- und openHAB-Verbindungen.
 2. Auf dem Host ausführen:
 
 ```bash
-python3 easy-start.py --image DOCKERHUB_NAMESPACE/sip-voice-home-control:latest
+(
+  set -e
+  if ! command -v python3 >/dev/null 2>&1; then
+    apt-get update
+    apt-get install -y python3
+  fi
+  python3 easy-start.py --image DOCKERHUB_NAMESPACE/sip-voice-home-control:latest
+)
 ```
 
 3. LXC-ID, Storage, Netzwerkbrücke und Debian-Vorlage auswählen.

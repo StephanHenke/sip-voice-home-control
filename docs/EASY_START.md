@@ -1,8 +1,8 @@
 # Easy Start auf Proxmox
 
 `deploy/lxc/easy-start.py` ist ein geführter Installer für die **Root-Konsole des
-Proxmox-Hosts**. Er benötigt Python 3 aus Proxmox und keine zusätzlichen
-Python-Pakete. Unterstützt wird amd64 mit einer Debian-12- oder Debian-13-Vorlage.
+Proxmox-Hosts**. Er benötigt Python 3 auf dem Host, aber keine zusätzlichen
+Python-Pakete. Python wird nicht als bereits installiert vorausgesetzt. Unterstützt wird amd64 mit einer Debian-12- oder Debian-13-Vorlage.
 Der Installer nutzt die Proxmox-Werkzeuge `pvesh`, `pveam` und `pct`.
 
 ## Einzeldatei starten
@@ -12,10 +12,18 @@ Der Installer enthält alle benötigten Vorlagen bereits: LXC-Einrichtung,
 Compose-Dateien, Startkonfiguration und Update-Skript. Ein Repository-Checkout
 oder das Nachladen weiterer Quelldateien über die GitHub-API ist nicht nötig.
 
-Auf der Proxmox-Root-Konsole starten:
+Auf der Proxmox-Root-Konsole starten. Falls Python 3 fehlt, installiert dieser
+Startblock es über die vorhandenen APT-Paketquellen; bei einem Fehler bricht er ab:
 
 ```bash
-python3 easy-start.py
+(
+  set -e
+  if ! command -v python3 >/dev/null 2>&1; then
+    apt-get update
+    apt-get install -y python3
+  fi
+  python3 easy-start.py
+)
 ```
 
 Das gewünschte Container-Image wird abgefragt. Ohne Tag wird automatisch `latest`
@@ -36,6 +44,10 @@ möglich. Er führt heruntergeladenen Code als root aus; Quelle zuvor prüfen:
 ```bash
 (
   set -e
+  if ! command -v python3 >/dev/null 2>&1 || ! command -v curl >/dev/null 2>&1; then
+    apt-get update
+    apt-get install -y python3 curl ca-certificates
+  fi
   installer="$(mktemp)"
   trap 'rm -f "$installer"' EXIT
   curl -fsSL https://raw.githubusercontent.com/OWNER/sip-voice-home-control/main/deploy/lxc/easy-start.py -o "$installer"
