@@ -77,6 +77,13 @@ Konfiguration, Webpasswort und Daten bleiben erhalten. `latest` folgt dem
 veröffentlichten Stand von `main`; für einen festen Stand einen vorhandenen
 `sha-…`-Tag oder Image-Digest verwenden.
 
+## Projekt unterstützen
+
+Dir gefällt SIP Voice Home Control? Mit einem Kaffee kannst du die
+Weiterentwicklung freiwillig unterstützen. ☕
+
+[Projekt über PayPal unterstützen](https://paypal.me/stephanhmoney)
+
 ## Hinweise und Lizenz
 
 Easy Start wurde automatisiert und mit einer vollständigen Erstinstallation in

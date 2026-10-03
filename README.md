@@ -401,6 +401,13 @@ Diese Erweiterungen sind noch nicht implementiert:
   Dynamische Inhalte wie Namen benötigen passende Aufnahmen oder eine
   ergänzende TTS-Ansage.
 
+## Projekt unterstützen
+
+Dir gefällt SIP Voice Home Control? Mit einem Kaffee kannst du die
+Weiterentwicklung freiwillig unterstützen. ☕
+
+[Projekt über PayPal unterstützen](https://paypal.me/stephanhmoney)
+
 ## Komponenten und Lizenzen
 
 Dieses Projekt steht unter der **GNU General Public License v3.0 oder neuer
