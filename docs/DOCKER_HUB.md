@@ -2,6 +2,7 @@
 
 ![Telefonanruf von einer Kinderuhr zum Öffnen der Haustür](https://raw.githubusercontent.com/OWNER/sip-voice-home-control/main/docs/assets/voice-home-header.png)
 
+[![GitHub Sponsors](https://img.shields.io/badge/GitHub-Sponsors-EA4AAA?style=for-the-badge&logo=githubsponsors&logoColor=white)](https://github.com/sponsors/StephanHenke)
 [![Mit PayPal unterstützen](https://img.shields.io/badge/PayPal-Projekt_unterst%C3%BCtzen-0070BA?style=for-the-badge&logo=paypal&logoColor=white)](https://paypal.me/stephanhmoney)
 
 **Dir gefällt das Projekt? Spendiere einen Kaffee und unterstütze die Weiterentwicklung. ☕**
@@ -86,7 +87,8 @@ veröffentlichten Stand von `main`; für einen festen Stand einen vorhandenen
 Dir gefällt SIP Voice Home Control? Mit einem Kaffee kannst du die
 Weiterentwicklung freiwillig unterstützen. ☕
 
-[Projekt über PayPal unterstützen](https://paypal.me/stephanhmoney)
+[Über GitHub Sponsors unterstützen](https://github.com/sponsors/StephanHenke) ·
+[Über PayPal unterstützen](https://paypal.me/stephanhmoney)
 
 ## Hinweise und Lizenz
 
