@@ -2,6 +2,10 @@
 
 ![Ein Kind öffnet die Haustür per Smartwatch-Anruf: Sprachbefehl, Bestätigungsfrage, Ja-Antwort und erfolgreiche Öffnung.](docs/assets/voice-home-header.png)
 
+[![Mit PayPal unterstützen](https://img.shields.io/badge/PayPal-Projekt_unterst%C3%BCtzen-0070BA?style=for-the-badge&logo=paypal&logoColor=white)](https://paypal.me/stephanhmoney)
+
+**Dir gefällt das Projekt? Spendiere einen Kaffee und unterstütze die Weiterentwicklung. ☕**
+
 Lokale Sprachsteuerung für openHAB über Telefonanrufe an eine FRITZ!Box.
 Ein Linux-Docker-Container, CPU-Verarbeitung, kein LLM, keine Cloud-Sprachdienste.
 Ausgelegt für kurze deutsche Befehle, beispielsweise von einer Xplora-Uhr.

@@ -2,6 +2,10 @@
 
 ![Telefonanruf von einer Kinderuhr zum Öffnen der Haustür](https://raw.githubusercontent.com/OWNER/sip-voice-home-control/main/docs/assets/voice-home-header.png)
 
+[![Mit PayPal unterstützen](https://img.shields.io/badge/PayPal-Projekt_unterst%C3%BCtzen-0070BA?style=for-the-badge&logo=paypal&logoColor=white)](https://paypal.me/stephanhmoney)
+
+**Dir gefällt das Projekt? Spendiere einen Kaffee und unterstütze die Weiterentwicklung. ☕**
+
 Haustür, Garagentor oder Licht per Telefon steuern – beispielsweise mit einer
 Kinderuhr, auf der sich keine zusätzliche Smart-Home-App installieren lässt.
 Der Controller registriert sich per SIP an einer FRITZ!Box, verarbeitet deutsche
