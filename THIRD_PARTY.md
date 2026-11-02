@@ -6,6 +6,7 @@ Die Projektlizenz lizenziert fremde Komponenten nicht um.
 
 | Komponente | Referenz |
 |---|---|
+| cryptography 50.0.2 | https://github.com/pyca/cryptography (Apache-2.0 oder BSD-3-Clause; mitgelieferte Lizenzhinweise beachten) |
 | PJSIP / PJSUA2 2.16 | https://github.com/pjsip/pjproject/tree/2.16 (GPL-2.0-or-later oder separate kommerzielle Lizenz) |
 | Vosk 0.3.45 | https://github.com/alphacep/vosk-api (Apache-2.0) |
 | Vosk German small 0.15 | https://alphacephei.com/vosk/models (Apache-2.0 laut Modellliste) |

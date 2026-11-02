@@ -2,9 +2,7 @@
 services:
   controller:
     command: [web]
-    environment:
-      VOICE_HOME_WEB_BIND: ${VOICE_HOME_WEB_BIND:-0.0.0.0}
-      VOICE_HOME_WEB_PORT: "8443"
+    # enabled/bind/port are configured under web in config.yaml.
     volumes: !override
       - ./config:/config
       - ./secrets:/run/secrets:ro

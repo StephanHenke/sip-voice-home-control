@@ -48,6 +48,15 @@ class Dialog:
             return "hangup", ""
         if s.state == "answer_delay" and now >= s.deadline:
             s.state = "speaking"
+            if s.caller.fixed_action:
+                action = self.actions[s.caller.fixed_action]
+                if not action.enabled:
+                    return 'goodbye', 'Diese Aktion ist noch nicht eingerichtet. Auf Wiederhören.'
+                if action.require_confirmation or s.caller.require_confirmation:
+                    s.pending_action = action.id
+                    return 'say', action.confirmation_text
+                s.state = 'executing'
+                return 'execute', action.id
             return "say", self.greeting(s.caller)
         if s.state in {"listening", "followup", "confirming"} and now >= s.deadline:
             return self.misunderstood(s)
@@ -96,6 +105,8 @@ class Dialog:
                 s.pending_action = None
                 s.failures = 0
                 s.state = "speaking"
+                if s.caller.fixed_action:
+                    return 'goodbye', 'Abgebrochen. Auf Wiederhören.'
                 return "followup", "Abgebrochen. Möchtest du noch etwas?"
             if kind != "stop":
                 return self.misunderstood(s)
@@ -103,6 +114,8 @@ class Dialog:
             s.pending_action = None
             s.state = "speaking"
             return "goodbye", "Auf Wiederhören."
+        if s.caller and s.caller.fixed_action:
+            return self.misunderstood(s)
         if kind == "yes" and s.state == "followup":
             s.failures = 0
             s.state = "speaking"
@@ -124,12 +137,21 @@ class Dialog:
         s.pending_action = None
         s.state = "speaking"
         text = {"ok": self.actions[action_id].success_text, "failed": "Fehlgeschlagen.", "unconfirmed": "Die Ausführung konnte nicht bestätigt werden.", "disabled": "Diese Aktion ist noch nicht eingerichtet."}[result]
+        if s.caller.fixed_action:
+            return 'goodbye', text + ' Auf Wiederhören.'
         return "followup", text + " Möchtest du noch etwas?"
 
     def prompts(self) -> set[str]:
         texts = {"Auf Wiederhören.", "Ich konnte dich nicht verstehen. Auf Wiederhören.", "Bitte nenne eine Aktion, zum Beispiel Haustür öffnen.", "Was möchtest du tun?", "Diese Aktion ist noch nicht eingerichtet. Möchtest du noch etwas?", "Abgebrochen. Möchtest du noch etwas?"}
         for caller in self.config.callers:
             texts.add(self.greeting(caller))
+            if caller.fixed_action:
+                action = self.actions[caller.fixed_action]
+                texts.update({action.confirmation_text, self.confirmation_retry(action.id)})
+                for result in ('ok', 'failed', 'unconfirmed', 'disabled'):
+                    texts.add(self.result(Session(caller, 0), action.id, result)[1])
+        texts.update({'Diese Aktion ist noch nicht eingerichtet. Auf Wiederhören.', 'Abgebrochen. Auf Wiederhören.'})
+        texts.discard('')
         for action in self.config.actions:
             if action.require_confirmation:
                 texts.add(action.confirmation_text)

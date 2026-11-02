@@ -86,6 +86,35 @@ def test_callback_rejects_before_scheduling_and_never_connects_inbound(setup):
     assert e.busy
 
 
+@pytest.mark.parametrize('trigger', ['reject', 'answer_hangup'])
+def test_fixed_callback_only_gets_session_after_outbound_confirmation(setup, trigger):
+    sip, pj, e, account, p, captured = setup
+    caller = replace(e.config.callers[0], fixed_action='front_door_open')
+    e.config = replace(e.config, callers=[caller], callback={**e.config.callback, 'trigger_mode':trigger},
+                       actions=[replace(a, enabled=True) for a in e.config.actions])
+    e.dialog = Dialog(e.config)
+    account.onIncomingCall(p)
+    incoming = captured[0]
+    e.process_event('state', incoming, pj.PJSIP_INV_STATE_CONFIRMED)
+    assert incoming.session is None and e.task is None
+    e.process_event('state', incoming, pj.PJSIP_INV_STATE_DISCONNECTED)
+    assert e.pending[1] is caller
+    outgoing = sip.Call(e, 2)
+    outgoing.caller = caller
+    e.current = outgoing
+    # Outbound ringing / early media never creates a session.
+    e.process_event('state', outgoing, 3)
+    assert outgoing.session is None and e.task is None
+    e.process_event('state', outgoing, pj.PJSIP_INV_STATE_CONFIRMED)
+    s = outgoing.session
+    assert s is not None
+    now = s.connected_at
+    assert e.dialog.tick(s, now) is None
+    e.dialog.media_ready(s, now)
+    assert e.dialog.tick(s, now+1) == ('execute', 'front_door_open')
+    assert e.dialog.tick(s, now+2) is None
+
+
 @pytest.mark.parametrize('mode', ['callback', 'direct'])
 def test_disabled_rejects_without_budget_or_answer(setup, mode):
     _, _, e, account, p, calls = setup

@@ -44,6 +44,8 @@ class Caller:
     number: str
     name: str
     access_mode: str = "callback"
+    fixed_action: str = ""
+    require_confirmation: bool = False
 
 
 @dataclass(frozen=True)
@@ -146,13 +148,19 @@ class Config:
     call_control: dict = field(default_factory=dict)
     smarthome: dict = field(default_factory=dict)
     logging: dict = field(default_factory=dict)
+    web: dict = field(default_factory=dict)
 
 
 def load(path: str | Path) -> Config:
-    raw = yaml.safe_load(Path(path).read_text(encoding="utf-8"))
+    return load_text(Path(path).read_text(encoding="utf-8"), path)
+
+
+def load_text(text: str, path: str | Path) -> Config:
+    from .credentials import parse_yaml, decrypt_inline
+    raw = parse_yaml(text)
     if not isinstance(raw, dict):
         raise ValueError("Konfiguration muss ein YAML-Objekt sein")
-    unknown = set(raw) - {"sip", "callers", "actions", "dialog", "callback", "openhab", "speech", "data_dir", "region", "call_control", "smarthome", "logging"}
+    unknown = set(raw) - {"sip", "callers", "actions", "dialog", "callback", "openhab", "speech", "data_dir", "region", "call_control", "smarthome", "logging", "web"}
     if unknown:
         raise ValueError(f"Unbekannte Konfigurationsbereiche: {sorted(unknown)}")
     region = raw.get("region", "DE")
@@ -166,9 +174,10 @@ def load(path: str | Path) -> Config:
     if not re.fullmatch(r"[A-Za-z0-9_.-]+", sip["username"]):
         raise ValueError("Ungültiger SIP-Benutzername")
     credential_source(sip, "password", Path(path).resolve().parent, required=True)
+    decrypt_inline(sip, 'password', path)
     if sip.get("public_address"):
         ipaddress.IPv4Address(sip["public_address"])
-    callers = [Caller(number(c["number"], region), str(c["name"]).strip(), c.get("access_mode", "callback")) for c in raw.get("callers", [])]
+    callers = [Caller(number(c["number"], region), str(c["name"]).strip(), c.get("access_mode", "callback"), c.get('fixed_action', ''), c.get('require_confirmation', False)) for c in raw.get("callers", [])]
     seen = set()
     own_number = number(sip["controller_number"], region) if sip.get("controller_number") else None
     for c in callers:
@@ -177,6 +186,10 @@ def load(path: str | Path) -> Config:
         if c.number in seen or c.number == own_number:
             raise ValueError("Doppelte Anrufernummer oder Rückruf auf eigene Controller-Nummer")
         seen.add(c.number)
+        if not isinstance(c.fixed_action, str) or type(c.require_confirmation) is not bool:
+            raise ValueError('Anrufer: fixed_action muss eine Kennung und require_confirmation ein Boolean sein')
+        if c.require_confirmation and not c.fixed_action:
+            raise ValueError('Anruferbestätigung benötigt fixed_action')
     actions = []
     ids = set()
     for a in raw.get("actions", []):
@@ -203,6 +216,13 @@ def load(path: str | Path) -> Config:
             if not isinstance(action.command, str) or not action.command or (action.feedback_mode == "state" and not action.resolved_success_values):
                 raise ValueError("Aktivierte Aktion benötigt Befehl und Erfolgswerte")
         actions.append(action)
+    for c in callers:
+        if c.fixed_action:
+            if c.fixed_action not in ids:
+                raise ValueError('Anrufer verweist auf unbekannte fixed_action')
+            action = next(a for a in actions if a.id == c.fixed_action)
+            if c.require_confirmation and not action.confirmation_text.strip():
+                raise ValueError('Feste Aktion mit Bestätigung benötigt confirmation_text')
     dialog = {"answer_delay_ms": 1000, "listen_timeout_seconds": 15, "max_utterance_seconds": 15, "max_failures": 2, "max_call_seconds": 120, **raw.get("dialog", {})}
     callback = {"trigger_mode": "reject", "delay_ms": 3000, "ring_timeout_seconds": 30, "cooldown_seconds": 60, "max_attempts_per_number_per_hour": 5, **raw.get("callback", {})}
     if callback["trigger_mode"] not in {"reject", "answer_hangup"}:
@@ -225,5 +245,7 @@ def load(path: str | Path) -> Config:
     if parsed_url.scheme not in {"http", "https"} or not parsed_url.hostname or parsed_url.username or parsed_url.query or parsed_url.fragment:
         raise ValueError("Ungültige openHAB-URL")
     credential_source(openhab, "token", Path(path).resolve().parent)
+    decrypt_inline(openhab, 'token', path)
     control, smart, logs = operational_settings(raw)
-    return Config(sip, callers, actions, dialog, callback, openhab, speech, Path(raw.get("data_dir", "/data")), region, control, smart, logs)
+    from .credentials import web_settings
+    return Config(sip, callers, actions, dialog, callback, openhab, speech, Path(raw.get("data_dir", "/data")), region, control, smart, logs, web_settings(raw))

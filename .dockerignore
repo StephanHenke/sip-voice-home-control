@@ -3,6 +3,7 @@
 __pycache__
 .pytest_cache
 config.yaml
+**/.secrets.key
 config.local.yaml
 secrets
 data

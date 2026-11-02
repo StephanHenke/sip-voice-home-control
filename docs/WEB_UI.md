@@ -1,6 +1,6 @@
 # HTTPS-Konfigurationsoberfläche
 
-Die optionale Oberfläche bietet einen YAML-Editor mit Zeilenanzeige und farbiger
+Die optionale Oberfläche bietet ein gruppiertes Einstellungsformular und einen YAML-Editor mit Zeilenanzeige und farbiger
 Syntaxansicht, Validierung, Speichern, Upload, Downloads und 20 Vorgängerversionen.
 Sie zeigt Betriebszustand, SIP-Rückmeldecode, Adapter und Gesprächsaktivität sowie
 einen kleinen RAM-Logpuffer. Es gibt ein Administrator-Konto ohne Benutzernamen.
@@ -105,8 +105,9 @@ eine Version hochladen, prüfen, speichern und neu starten. Die letzten 20
 Vorgängerversionen liegen unter `/config/.versions`; ältere werden beim Speichern
 entfernt. Diese bewussten Konfigurationsänderungen sind persistente Schreibvorgänge.
 
-Direkt in YAML eingetragene Zugangsdaten sind im authentifizierten Editor und in
-Downloads enthalten. Deshalb Secret-Dateien bevorzugen. Sie werden weder vom
+Direkte SIP-Passwörter und openHAB-Tokens werden beim Speichern und Start
+verschlüsselt. Editor und Downloads enthalten danach die verschlüsselten Werte.
+Der separate Schlüssel muss für eine Wiederherstellung gesichert werden. Sie werden weder vom
 Editor gelesen noch in Versionsdownloads aufgenommen. Downloads vertraulich
 behandeln. Passwort-Hash und TLS-Schlüssel sind nicht über die Download-API erreichbar.
 
@@ -119,3 +120,10 @@ mit Inhalten protokolliert. Docker-Logging bleibt in der LXC-Vorlage ausgeschalt
 
 Mit INFO/console ist der RAM-Logpuffer aktiv; der Docker-Treiber none verhindert
 eine zusätzliche Konsolen-Logdatei.
+
+## Formulare, Abschalten und Verschlüsselung
+
+Alle YAML-Anwendungsparameter sind unter **Config → Formular** bearbeitbar.
+Der **YAML-Editor** bleibt alternativ verfügbar; beide Ansichten teilen einen Entwurf.
+`web.enabled: false` schaltet die Oberfläche nach Neustart vollständig ab.
+[Details, feste Anruferaktionen und Upgradehinweise](FIXED_ACTIONS_AND_SECRETS.md).

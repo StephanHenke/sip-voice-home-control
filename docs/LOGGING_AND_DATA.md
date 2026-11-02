@@ -104,3 +104,13 @@ bestätigtem Aktionserfolg ein Text einschließlich konfiguriertem Namen an open
 übertragen. Controllerlogs enthalten diesen Text nicht. openHAB-Ereignislogs sowie Cloud-/Mobil-Push-Dienste
 können den Text jedoch speichern. Die Controllerwarteschlange ist ausschließlich
 im RAM. Details: [Push-Benachrichtigungen](OPENHAB_NOTIFICATIONS.md).
+
+## Verschlüsselte Inline-Zugangsdaten
+
+SIP-Passwort und openHAB-Token werden beim Web-Speichern bzw. Dienststart in
+YAML und lokalen `.versions` verschlüsselt. `.secrets.key` neben der YAML ist
+eine zusätzliche persistente Datei (0600); alternativ externer Schlüsselpfad
+über `VOICE_HOME_SECRETS_KEY_FILE`. Validation schreibt keine Klartext-Testdatei.
+Externe Secret-Dateien und fremde/ältere Backups werden nicht umgeschrieben.
+Namen, Nummern und Items bleiben lesbar.
+[Schlüssel, Wiederherstellung und Grenzen](FIXED_ACTIONS_AND_SECRETS.md).

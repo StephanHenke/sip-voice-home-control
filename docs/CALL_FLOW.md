@@ -117,3 +117,34 @@ AUS sperrt neue Anrufe und verwirft wartende Rueckrufe. Bestehende Gespraeche
 bleiben mit allen Befehlen nutzbar. Ein bereits gestarteter ausgehender Rueckruf
 laeuft weiter. EIN reaktiviert keine verworfenen Rueckrufe. Limits mit Wert 0
 sind unabhaengig deaktiviert. Keine neue TTS-Ansage durch Statussteuerung.
+
+## Optional: feste Aktion des Anrufers
+
+Nach der im Diagramm gezeigten bestätigten Verbindung und Audiopause wird bei
+`callers[].fixed_action` der normale Sprachdialog durch folgenden Ablauf ersetzt:
+
+```mermaid
+flowchart TD
+    Connected[Bestätigte Verbindung und Audio bereit] --> Pause[answer_delay_ms abwarten]
+    Pause --> Enabled{Feste Aktion aktiviert?}
+    Enabled -- Nein --> Disabled[Diese Aktion ist noch nicht eingerichtet. Auf Wiederhören.]
+    Enabled -- Ja --> Confirm{Bestätigung an Aktion oder Anrufer aktiviert?}
+    Confirm -- Nein --> Execute[Feste Aktion genau einmal ausführen]
+    Confirm -- Ja --> Question[confirmation_text und Signalton]
+    Question --> Reply{Antwort}
+    Reply -- Ja --> Execute
+    Reply -- Nein oder Abbruch --> Cancel[Abgebrochen. Auf Wiederhören.]
+    Reply -- Andere Aktion / unklar / Schweigen --> Retry{Fehlergrenze erreicht?}
+    Retry -- Nein --> Again[Bitte antworte mit Ja oder Nein. confirmation_text]
+    Again --> Reply
+    Retry -- Ja --> Failed[Ich konnte dich nicht verstehen. Auf Wiederhören.]
+    Execute --> Result[success_text / Fehlgeschlagen. / Die Ausführung konnte nicht bestätigt werden.]
+    Result --> Bye[Auf Wiederhören.]
+    Bye --> End([Auflegen])
+    Disabled --> End
+    Cancel --> End
+    Failed --> End
+```
+
+Rückrufauslösung und klingelnde Rückrufe durchlaufen diesen Ablauf nicht.
+Es gibt keine Folgefrage und keine Auswahl einer anderen Aktion.

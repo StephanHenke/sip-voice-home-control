@@ -21,6 +21,11 @@ BUNDLED_FILES = {
 region: DE
 data_dir: /data
 
+web:
+  enabled: true  # false: auch beim Startbefehl web nur SIP starten, kein Webport
+  bind: 0.0.0.0
+  port: 8443
+
 sip:
   host: 192.0.2.1
   username: voice-controller
@@ -38,6 +43,8 @@ callers: []
 #  - number: "+49..."
 #    name: "Testperson"
 #    access_mode: callback  # Standard; direct ist ausdrücklich konfigurierbar
+#    fixed_action: front_door_open  # Optional; ohne Feld normaler Sprachdialog
+#    require_confirmation: true    # Zusätzlich zur Bestätigung an der Aktion
 
 dialog:
   answer_delay_ms: 1000
@@ -277,7 +284,7 @@ echo 'Supply config/config.yaml and secrets, log in to the registry, then run up
     tmpfs:
       - /tmp:size=128m,mode=1777
     volumes:
-      - ./config:/config:ro
+      - ./config:/config
       - ./secrets:/run/secrets:ro
       - ./data:/data
     healthcheck:
@@ -293,9 +300,7 @@ echo 'Supply config/config.yaml and secrets, log in to the registry, then run up
 services:
   controller:
     command: [web]
-    environment:
-      VOICE_HOME_WEB_BIND: ${VOICE_HOME_WEB_BIND:-0.0.0.0}
-      VOICE_HOME_WEB_PORT: "8443"
+    # enabled/bind/port are configured under web in config.yaml.
     volumes: !override
       - ./config:/config
       - ./secrets:/run/secrets:ro

@@ -20,6 +20,7 @@ def main():
     sub.add_parser("serve", help="SIP und Sprachdialog starten")
     sub.add_parser("web", help="HTTPS-Administration und Controller starten")
     sub.add_parser("web-password", help="Admin-Passwort interaktiv zurücksetzen")
+    sub.add_parser("encrypt-secrets", help="Inline-Zugangsdaten in YAML und lokalen Versionen verschlüsseln")
     probe = sub.add_parser("register", help="Nur SIP-Anmeldung testen; alle Anrufe ablehnen")
     probe.add_argument("--seconds", type=float, default=15)
     sub.add_parser("status", help="Aktuellen Betriebszustand als JSON ausgeben")
@@ -36,6 +37,12 @@ def main():
             from .web import serve
             serve(args.config)
             return
+        if args.command in {'serve', 'encrypt-secrets'}:
+            from .credentials import protect_config
+            protect_config(args.config)
+            if args.command == 'encrypt-secrets':
+                print('Inline-Zugangsdaten verschlüsselt. Schlüssel separat sichern.')
+                return
         config = load(args.config)
         if args.command in {'serve', 'register'}:
             suppress_native_output()

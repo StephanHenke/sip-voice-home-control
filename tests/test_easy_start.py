@@ -144,7 +144,9 @@ def test_web_can_repair_locked_initial_config(tmp_path):
     assert admin.can_restart()
     configured = before['yaml'].replace('password: ""', 'password: "test-sip-password"')
     admin.store.save(configured, before['revision'])
-    assert 'test-sip-password' in admin.store.read()['yaml']
+    assert 'test-sip-password' not in admin.store.read()['yaml']
+    from voice_home.config import load, credential
+    assert credential(load(config).sip, 'password') == 'test-sip-password'
 
 
 def test_main_complete_flow_with_simulated_proxmox(monkeypatch):

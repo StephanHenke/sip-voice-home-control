@@ -1,9 +1,9 @@
 'use strict';
-let csrf='', revision='', dirty=false, timer;
+let csrf='', revision='', dirty=false, timer, formMode=true;
 const $=id=>document.getElementById(id), note=s=>{$('notice').textContent=s;};
 async function api(path,data){const r=await fetch('/api/'+path,{method:data?'POST':'GET',headers:data?{'Content-Type':'application/json','X-CSRF-Token':csrf}:{},body:data?JSON.stringify(data):undefined});const v=await r.json();if(!r.ok)throw Error(v.error||'Anfrage fehlgeschlagen');return v;}
-function locked(){clearInterval(timer);$('passwordPanel').hidden=true;$('changePasswordForm').reset();$('workspace').hidden=true;$('login').hidden=false;csrf='';dirty=false;$('editor').value='';$('logs').textContent='';}
-async function read(){const v=await api('config');$('editor').value=v.yaml;revision=v.revision;dirty=false;}
+function locked(){clearInterval(timer);$('passwordPanel').hidden=true;$('changePasswordForm').reset();$('workspace').hidden=true;$('login').hidden=false;csrf='';dirty=false;$('editor').value='';$('logs').textContent='';configForm.clear();}
+async function read(){const v=await api('config');$('editor').value=v.yaml;revision=v.revision;dirty=false;await loadForm();}
 async function versions(){const v=await api('versions');$('versions').replaceChildren();for(const name of v.versions){const a=document.createElement('a');a.textContent=name;a.href='/api/versions/'+encodeURIComponent(name);a.download=name;$('versions').append(a);}}
 const codes={0:'Noch keine SIP-Antwort',200:'Anmeldung erfolgreich',401:'Authentifizierung angefordert',403:'Zugang verweigert',404:'Teilnehmer nicht gefunden',408:'Zeitüberschreitung',423:'Registrierungsintervall zu kurz',500:'Serverfehler',503:'Dienst nicht verfügbar'};
 async function refresh(){const s=await api('status');$('status').replaceChildren();for(const [label,value] of [['Betrieb',s.status],['SIP-Code',(s.registration_code??'—')+' · '+(codes[s.registration_code]||'SIP-Rückmeldung')],['Annahme',s.accepting===null?'Unbekannt':s.accepting?'ON':'OFF'],['Gespräch',s.call_active===null?'Unbekannt':s.call_active?'Aktiv':'Keines'],['Adapter',s.adapter_connected===null?'Nicht aktiviert':s.adapter_connected?'Verbunden':'Getrennt'],['Aktualität',s.fresh?'Aktuell':'Veraltet / fehlt']]){const div=document.createElement('div');div.className='metric';div.textContent=label;const b=document.createElement('strong');b.textContent=value??'Unbekannt';div.append(b);$('status').append(div);}$('pending').textContent=s.pending_changes?'Gespeicherte Änderungen warten auf Neustart.':'Gespeicherte Konfiguration entspricht dem gestarteten Stand.';}
@@ -18,9 +18,9 @@ $('logout').onclick=()=>action(async()=>{if(dirty&&!confirm('Ungespeicherte Änd
 $('editor').oninput=()=>{dirty=true;};$('editor').onkeyup=()=>{$('position').textContent='Zeile '+$('editor').value.slice(0,$('editor').selectionStart).split('\n').length;};
 $('editor').onkeydown=e=>{if(e.key==='Tab'){e.preventDefault();const t=e.target,a=t.selectionStart,b=t.selectionEnd;t.setRangeText('  ',a,b,'end');dirty=true;}};
 $('read').onclick=()=>{if(!dirty||confirm('Ungespeicherte Änderungen verwerfen?'))action(read);};
-$('validate').onclick=()=>action(async()=>note((await api('validate',{yaml:$('editor').value})).message));
-$('save').onclick=()=>action(async()=>{const v=await api('save',{yaml:$('editor').value,revision});revision=v.revision;dirty=false;note(v.message);await versions();await refresh();});
-$('upload').onchange=()=>action(async()=>{const file=$('upload').files[0];if(!file)return;if(file.size>262144)throw Error('Datei zu groß (maximal 256 KiB).');if(dirty&&!confirm('Editorinhalt durch Upload ersetzen?'))return;const text=await file.text();$('editor').value=text;dirty=true;note('Upload im Editor. Noch nicht gespeichert.');await api('validate',{yaml:text});note('Upload gültig. Zum Übernehmen zuerst speichern.');});
+$('validate').onclick=()=>action(async()=>{await syncDraft();note((await api('validate',{yaml:$('editor').value})).message);});
+$('save').onclick=()=>action(async()=>{const panel=document.querySelector('[data-page=config]');panel.inert=true;try{await syncDraft();const v=await api('save',{yaml:$('editor').value,revision});$('editor').value=v.yaml;revision=v.revision;dirty=false;await loadForm();note(v.message);await versions();await refresh();}finally{panel.inert=false;}});
+$('upload').onchange=()=>action(async()=>{const file=$('upload').files[0];if(!file)return;if(file.size>262144)throw Error('Datei zu groß (maximal 256 KiB).');if(dirty&&!confirm('Editorinhalt durch Upload ersetzen?'))return;const text=await file.text();$('editor').value=text;dirty=true;await loadForm();note('Upload im Editor. Noch nicht gespeichert.');await api('validate',{yaml:text});note('Upload gültig. Zum Übernehmen zuerst speichern.');});
 $('restart').onclick=()=>action(async()=>{if(dirty)throw Error('Zuerst speichern oder ungespeicherte Änderungen verwerfen.');if(!confirm('Controller neu starten? Die Verbindung zur Oberfläche wird kurz unterbrochen.'))return;note((await api('restart',{})).message);locked();});
 window.addEventListener('beforeunload',e=>{if(dirty){e.preventDefault();e.returnValue='';}});
 enter().catch(locked);
@@ -30,3 +30,9 @@ $('syntax').ontoggle=()=>{if($('syntax').open)highlight();};
 $('editor').addEventListener('input',()=>{if($('syntax').open)highlight();});
 
 $('changePasswordForm').onsubmit=e=>{e.preventDefault();action(async()=>{if(dirty)throw Error('Zuerst YAML speichern oder Änderungen verwerfen.');if($('newPassword').value!==$('repeatPassword').value)throw Error('Die neuen Passwörter stimmen nicht überein.');const result=await api('password',{current_password:$('currentPassword').value,new_password:$('newPassword').value});locked();note(result.message);});};
+
+async function loadForm(){if(!formMode)return;try{await configForm.load($('editor').value);}catch(e){formMode=false;showMode();note(e.message);}}
+async function syncDraft(){if(formMode)$('editor').value=await configForm.yaml($('editor').value);}
+function showMode(){$('settingsForm').hidden=!formMode;$('yamlPanel').hidden=formMode;$('formHint').hidden=!formMode;$('modeForm').classList.toggle('primary',formMode);$('modeYaml').classList.toggle('primary',!formMode);}
+$('modeForm').onclick=()=>action(async()=>{if(formMode)return;await configForm.load($('editor').value);formMode=true;showMode();});
+$('modeYaml').onclick=()=>action(async()=>{await syncDraft();formMode=false;showMode();if($('syntax').open)highlight();});

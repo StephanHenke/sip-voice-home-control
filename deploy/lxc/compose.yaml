@@ -12,7 +12,7 @@ services:
     tmpfs:
       - /tmp:size=128m,mode=1777
     volumes:
-      - ./config:/config:ro
+      - ./config:/config
       - ./secrets:/run/secrets:ro
       - ./data:/data
     healthcheck:

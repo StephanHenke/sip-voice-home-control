@@ -14,7 +14,7 @@ services:
     tmpfs:
       - /tmp:size=64m,mode=1777
     volumes:
-      - ./config.yaml:/config/config.yaml:ro
+      - ./config:/config
       - controller-data:/data
     healthcheck:
       test: [CMD, voice-home, health]

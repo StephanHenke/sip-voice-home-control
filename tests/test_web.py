@@ -93,6 +93,10 @@ def test_http_auth_csrf_and_download(store, tmp_path):
         with pytest.raises(urllib.error.HTTPError) as error:
             request('/api/config')
         assert error.value.code == 401
+        for path in ('/api/form', '/api/form/yaml'):
+            with pytest.raises(urllib.error.HTTPError) as error:
+                request(path, {})
+            assert error.value.code == 403
         response = request('/api/login', {'password': 'valid password'})
         cookie = response.headers['Set-Cookie']
         assert 'Secure' in cookie and 'HttpOnly' in cookie and 'SameSite=Strict' in cookie
@@ -101,7 +105,16 @@ def test_http_auth_csrf_and_download(store, tmp_path):
         with pytest.raises(urllib.error.HTTPError) as error:
             request('/api/save', {'yaml': store.read()['yaml'], 'revision': store.read()['revision']}, headers)
         assert error.value.code == 403
+        for path in ('/api/form', '/api/form/yaml'):
+            with pytest.raises(urllib.error.HTTPError) as error:
+                request(path, {}, headers)
+            assert error.value.code == 403
         headers['X-CSRF-Token'] = csrf
+        form = json.load(request('/api/form', {'yaml': store.read()['yaml']}, headers))
+        converted = json.load(request('/api/form/yaml', {'config': form['config']}, headers))
+        assert 'enc:v1:' in converted['yaml']
+        assert 'test-only-secret' not in converted['yaml']
+        store.validate(converted['yaml'])
         assert request('/api/validate', {'yaml': store.read()['yaml']}, headers).status == 200
         response = request('/api/download', headers=headers)
         assert response.headers['Cache-Control'] == 'no-store'

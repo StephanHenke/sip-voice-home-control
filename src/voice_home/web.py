@@ -19,7 +19,8 @@ import time
 
 import yaml
 
-from .config import load, credential
+from .config import load_text, credential
+from .credentials import protect_config, encrypt_text, atomic_private, parse_yaml, web_settings
 from .runtime import read_status
 
 LIMIT = 256 * 1024
@@ -75,6 +76,7 @@ def reset_password(path=AUTH):
 class Store:
     def __init__(self, config):
         self.path = Path(config).resolve()
+        protect_config(self.path)
         self.versions = self.path.parent / '.versions'
         self.versions.mkdir(mode=0o700, exist_ok=True)
         self.lock = threading.RLock()
@@ -86,12 +88,11 @@ class Store:
     def validate(self, text):
         if not isinstance(text, str) or len(text.encode()) > LIMIT:
             raise ValueError('YAML ist zu groß (maximal 256 KiB).')
-        # Same directory preserves relative secret paths. Never expose YAML values
+        # The original path preserves relative secret paths without a temp file.
+        # Never expose YAML values
         # or exception snippets (which could contain secrets) in diagnostics.
-        test = self.path.parent / ('.validate-' + secrets.token_hex(8))
         try:
-            atomic(test, text)
-            cfg = load(test)
+            cfg = load_text(text, self.path)
             credential(cfg.sip, 'password')
             credential(cfg.openhab, 'token')
         except yaml.YAMLError as e:
@@ -100,8 +101,6 @@ class Store:
             raise ValueError('YAML-Syntaxfehler' + where) from None
         except Exception:
             raise ValueError('Konfiguration ungültig oder Secret-Datei nicht lesbar. Konfigurationsreferenz prüfen.') from None
-        finally:
-            test.unlink(missing_ok=True)
 
     def save(self, text, revision):
         with self.lock:
@@ -109,10 +108,11 @@ class Store:
             if not hmac.compare_digest(current['revision'], str(revision)):
                 raise ValueError('Konfiguration wurde zwischenzeitlich geändert. Zuerst neu laden.')
             self.validate(text)
+            text = encrypt_text(text, self.path)
             if text != current['yaml']:
                 name = time.strftime('%Y%m%dT%H%M%SZ', time.gmtime()) + '-' + secrets.token_hex(4) + '.yaml'
-                atomic(self.versions / name, current['yaml'])
-                atomic(self.path, text)
+                atomic_private(self.versions / name, encrypt_text(current['yaml'], self.path))
+                atomic_private(self.path, text)
                 for old in sorted(self.versions.glob('*.yaml'))[:-20]:
                     old.unlink()
             return self.read()
@@ -225,8 +225,8 @@ def handler(admin):
                 return ''
 
         def do_GET(self):
-            if self.path in ('/', '/app.js', '/style.css'):
-                file, mime = {'/': ('index.html', 'text/html'), '/app.js': ('app.js', 'text/javascript'), '/style.css': ('style.css', 'text/css')}[self.path]
+            if self.path in ('/', '/app.js', '/form.js', '/style.css'):
+                file, mime = {'/': ('index.html', 'text/html'), '/app.js': ('app.js', 'text/javascript'), '/form.js': ('form.js', 'text/javascript'), '/style.css': ('style.css', 'text/css')}[self.path]
                 return self.respond(200, (Path(__file__).parent / 'web_static' / file).read_text(encoding='utf-8'), mime)
             session = admin.session(self.token())
             if not session:
@@ -285,9 +285,15 @@ def handler(admin):
                 if self.path == '/api/validate':
                     admin.store.validate(data.get('yaml'))
                     return self.respond(200, {'message': 'YAML und Konfiguration gültig.'})
+                if self.path == '/api/form':
+                    from .web_form import form_document
+                    return self.respond(200, form_document(data.get('yaml')))
+                if self.path == '/api/form/yaml':
+                    from .web_form import form_yaml
+                    return self.respond(200, {'yaml': form_yaml(data.get('config'))})
                 if self.path == '/api/save':
                     result = admin.store.save(data.get('yaml'), data.get('revision'))
-                    return self.respond(200, {'revision': result['revision'], 'message': 'Gespeichert. Zum Anwenden neu starten.'})
+                    return self.respond(200, {**result, 'message': 'Gespeichert. Zugangsdaten verschlüsselt. Zum Anwenden neu starten.'})
                 if self.path == '/api/restart':
                     with admin.store.lock:
                         admin.store.validate(admin.store.read()['yaml'])
@@ -306,6 +312,11 @@ def handler(admin):
 
 
 def serve(config):
+    options = web_settings(parse_yaml(Path(config).read_text(encoding='utf-8')))
+    if not options['enabled']:
+        # Replace PID 1: no listener, TLS load, auth file or web log is created.
+        os.execv(sys.executable, [sys.executable, '-m', 'voice_home.cli', '--config', str(config), 'serve'])
+        return
     initialize_password()
     admin = Admin(config)
     class BoundedServer(ThreadingHTTPServer):
@@ -327,7 +338,7 @@ def serve(config):
             finally:
                 self.slots.release()
 
-    server = BoundedServer((os.getenv('VOICE_HOME_WEB_BIND', '0.0.0.0'), int(os.getenv('VOICE_HOME_WEB_PORT', '8443'))), handler(admin))
+    server = BoundedServer((os.getenv('VOICE_HOME_WEB_BIND', options['bind']), int(os.getenv('VOICE_HOME_WEB_PORT', options['port']))), handler(admin))
     context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
     context.minimum_version = ssl.TLSVersion.TLSv1_2
     context.load_cert_chain('/web/tls.crt', '/web/tls.key')

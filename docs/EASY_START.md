@@ -7,6 +7,11 @@ installiert; zusätzliche Python-Pakete sind nicht nötig. Unterstützt wird amd
 mit einer Debian-12- oder Debian-13-Vorlage.
 Der Installer nutzt die Proxmox-Werkzeuge `pvesh`, `pveam` und `pct`.
 
+Die Oberfläche bietet Formular und YAML-Editor. Inline-Zugangsdaten werden
+verschlüsselt; neben der YAML muss auch `.secrets.key` geschützt gesichert werden.
+Vor Updates älterer Installationen die [Upgrade-Hinweise](FIXED_ACTIONS_AND_SECRETS.md#upgrade-und-reiner-dateibetrieb)
+zu Mounts und Image-Rollbacks beachten.
+
 ## Einzeiler und Menüs
 
 In der interaktiven Root-Konsole des Proxmox-Hosts oder des eingerichteten LXC

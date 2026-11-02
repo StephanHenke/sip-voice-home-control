@@ -11,6 +11,17 @@ Lokale Sprachsteuerung für openHAB über Telefonanrufe an eine FRITZ!Box.
 Ein Linux-Docker-Container, CPU-Verarbeitung, kein LLM, keine Cloud-Sprachdienste.
 Ausgelegt für kurze deutsche Befehle, beispielsweise von einer Xplora-Uhr.
 
+## Einrichtung und feste Anruferaktionen
+
+Die Weboberfläche bietet Formulare für Verbindungen, Anrufer, Aktionen und
+Betriebseinstellungen. Der YAML-Editor und der reine Dateibetrieb bleiben möglich.
+Mit `web.enabled: false` lässt sich die Oberfläche abschalten.
+Optional führt `callers[].fixed_action` nach Annahme genau eine Aktion aus,
+fragt bei Bedarf nach Bestätigung und legt nach der Ergebnisansage auf.
+Beim Rückruf wird erst nach dessen Annahme ausgeführt.
+Inline-Zugangsdaten werden verschlüsselt; Schlüssel separat sichern.
+[Konfiguration, Verschlüsselung und Upgrade](docs/FIXED_ACTIONS_AND_SECRETS.md).
+
 ## Warum ein Anruf von der Kinderuhr?
 
 Bei Kinderuhren, auf denen sich keine zusätzlichen Apps installieren lassen,
@@ -142,8 +153,12 @@ Als Ausgangspunkt zwei CPU-Kerne und 2 GB RAM einplanen; reale Last und Latenz m
 ```bash
 git clone https://github.com/OWNER/sip-voice-home-control.git
 cd sip-voice-home-control
-cp config.example.yaml config.yaml
-# config.yaml bearbeiten: SIP-Passwort direkt oder Secret-Dateivariante verwenden.
+mkdir -p config
+cp config.example.yaml config/config.yaml
+# config/config.yaml bearbeiten: SIP-Passwort direkt oder Secret-Dateivariante verwenden.
+# Linux: Container-UID benötigt Schreibzugriff für automatische Verschlüsselung.
+sudo chown -R 10001:10001 config
+sudo chmod 700 config
 # openHAB, freigegebene Anrufer und Aktionen konfigurieren.
 docker compose build
 docker compose run --rm controller validate

@@ -1,6 +1,6 @@
 # Vollständige Konfigurationsreferenz
 
-Stand: 30.09.2026. Diese Referenz beschreibt die implementierten Parameter.
+Stand: 02.11.2026. Diese Referenz beschreibt die implementierten Parameter.
 Die Standardwerte stammen aus dem Code; die [Beispiel-YAML](../config.example.yaml)
 setzt teilweise ausdrücklich andere Werte. Private Einstellungen gehören in
 `config.yaml` beziehungsweise `config.local.yaml`.
@@ -12,7 +12,7 @@ Ein Image-Neubau ist für reine Konfigurationsänderungen nicht erforderlich.
 ## Aufbau und allgemeine Werte
 
 Die obersten Bereiche sind `sip`, `callers`, `dialog`, `callback`, `openhab`,
-`speech`, `actions`, `smarthome`, `call_control` und `logging`; hinzu kommen `region` und `data_dir`.
+`speech`, `actions`, `smarthome`, `call_control` und `logging` sowie `web`; hinzu kommen `region` und `data_dir`.
 
 | Parameter | Standard | Bedeutung |
 | --- | --- | --- |
@@ -53,11 +53,13 @@ Jeder Eintrag in `callers` enthält:
 | --- | --- | --- |
 | `callers[].number` | Pflicht | Vollständige Telefonnummer, z. B. `"+4915123456789"`. Wird normalisiert; nationale Schreibweise nutzt `region`. Im Rückrufmodus ist dies zugleich das feste Rückrufziel. |
 | `callers[].name` | Pflicht | Begrüßungsname, nicht leer und höchstens 80 Zeichen. Wird auch in einer gespeicherten TTS-Ansage gesprochen. |
+| `callers[].fixed_action` | leer | Optional: ID einer festen Aktion; nach bestätigter Verbindung, optionaler Bestätigung und Ergebnisansage auflegen. |
+| `callers[].require_confirmation` | `false` | Zusätzliche Bestätigung für fixed_action; Aktionsbestätigung bleibt immer verbindlich. |
 | `callers[].access_mode` | `callback` | `callback`: Anruf beenden und gespeicherte Nummer zurückrufen. `direct`: erlaubten Anruf direkt annehmen und Dialog starten. |
 
-Normalisierte Nummern müssen eindeutig sein. Alle erlaubten Anrufer können alle
-aktivierten Aktionen verwenden; individuelle Aktionsrechte pro Person sind
-derzeit nicht implementiert. Name und Rufnummer werden nicht aus dem SIP-Anzeigenamen
+Normalisierte Nummern müssen eindeutig sein. Anrufer ohne feste Aktion können alle
+aktivierten Aktionen verwenden. Anrufer mit `fixed_action` bleiben auf diese
+Aktion beschränkt. Name und Rufnummer werden nicht aus dem SIP-Anzeigenamen
 übernommen. Details zur Reichweite des Rückrufschutzes: [Anforderungen](REQUIREMENTS.md).
 
 ## Gespräch und Wartezeiten
@@ -204,7 +206,7 @@ Anwendungs-YAML. Service-Name: `controller`.
 | `read_only`, `cap_drop`, `security_opt` | `true`, `[ALL]`, `[no-new-privileges:true]`. |
 | `mem_limit`, `cpus` | `2g`, `2`. |
 | `tmpfs` | `/tmp:size=64m,mode=1777`; flüchtiges temporäres Dateisystem. |
-| `volumes` | `./config.yaml` schreibgeschützt nach `/config/config.yaml`; benanntes Volume `controller-data` nach `/data`. Bei Änderung von `data_dir` die Einbindung anpassen. |
+| `volumes` | `./config` beschreibbar nach `/config` (YAML und Verschlüsselungsschlüssel); benanntes Volume `controller-data` nach `/data`. Bei Änderung von `data_dir` die Einbindung anpassen. |
 | `secrets` | Optional ueber `compose.secrets.yaml`: Dateien nach `/run/secrets/`. Fuer UID 10001 lesbar; bei direkter YAML-Konfiguration nicht erforderlich. |
 | `healthcheck.test` | `[CMD, voice-home, health]`. |
 | `healthcheck.interval`, `timeout`, `start_period`, `retries` | `15s`, `5s`, `180s`, `3`. |
@@ -247,3 +249,15 @@ Logeinstellungen werden beim Prozessstart geladen; Aenderungen brauchen einen Ne
 `{name}`, maximal 500 Zeichen ohne Zeilenumbrüche. Meldungen werden ausschließlich
 bei bestätigtem Erfolg per Adapter veröffentlicht. Einrichtung und Grenzen:
 [openHAB Push](OPENHAB_NOTIFICATIONS.md).
+
+## Web und verschlüsselte Zugangsdaten
+
+| Parameter | Standard | Bedeutung |
+| --- | --- | --- |
+| `web.enabled` | `true` | Bei false startet auch der Befehl web nur den SIP-Dienst. |
+| `web.bind` | `0.0.0.0` | Lokale IPv4-Bind-Adresse. |
+| `web.port` | `8443` | HTTPS-Port, 1024–65535. |
+
+Inline-Passwörter und Tokens werden beim Speichern bzw. Dienststart verschlüsselt.
+Der Schlüssel muss separat gesichert werden. CLI: `voice-home --config /config/config.yaml encrypt-secrets`.
+[Formular, feste Aktionen, Schlüssel und Upgrade](FIXED_ACTIONS_AND_SECRETS.md).

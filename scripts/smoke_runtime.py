@@ -13,10 +13,20 @@ import pjsua2 as pj
 
 from voice_home.sip import AudioSink, Player
 from voice_home.speech import Speech
+from voice_home.credentials import protect_config
+from voice_home.config import load
 
 
 def main():
     with tempfile.TemporaryDirectory() as directory:
+        # Exercise encryption with the non-root image user and RAM-only storage.
+        configuration = Path(directory) / 'config.yaml'
+        configuration.write_text(Path('/app/config.example.yaml').read_text(), encoding='utf-8')
+        original_password = load(configuration).sip['password']
+        protect_config(configuration)
+        assert 'enc:v1:' in configuration.read_text()
+        assert load(configuration).sip['password'] == original_password
+        assert (Path(directory) / '.secrets.key').stat().st_mode & 0o777 == 0o600
         phrase = "Tür öffnen."
         speech = Speech({"asr_model": "/models/vosk-model-small-de-0.15", "tts_model": "/models/de_DE-thorsten-medium.onnx"}, Path(directory), {phrase})
         with wave.open(str(speech.path(phrase)), "rb") as wav:
